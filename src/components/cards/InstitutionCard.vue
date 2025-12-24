@@ -72,6 +72,9 @@ const formatNumber = (num) => {
   cursor: pointer;
   transition: all var(--transition-normal);
   border: 1px solid var(--border-lighter);
+  height: 180px;
+  display: flex;
+  flex-direction: column;
 
   &:hover {
     transform: translateY(-4px);
@@ -82,9 +85,11 @@ const formatNumber = (num) => {
 
 .card-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   margin-bottom: 16px;
+  flex: 1;
+  min-height: 0;
 
   .inst-logo {
     width: 60px;
@@ -107,13 +112,17 @@ const formatNumber = (num) => {
     min-width: 0;
 
     .inst-name {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
       color: var(--text-primary);
       margin-bottom: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
+      line-height: 1.4;
+      max-height: 42px;
     }
 
     .inst-url {
