@@ -1,0 +1,15 @@
+# Ignore dependencies and build artifacts
+node_modules/
+.vite/
+dist/
+/.env
+.env.local
+*.log
+package-lock.json
+/.DS_Store
+.idea/
+.vscode/
+
+# Optional: lockfiles for other package managers
+pnpm-lock.yaml
+yarn.lock
