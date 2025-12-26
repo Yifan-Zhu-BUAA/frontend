@@ -10,7 +10,7 @@
 
     <el-table :data="applications" v-loading="loading" border stripe>
       <el-table-column prop="applicationId" label="申请ID" width="80" />
-      <el-table-column prop="uid" label="用户ID" width="100" />
+      <el-table-column prop="userId" label="用户ID" width="100" />
       <el-table-column prop="authorName" label="学者姓名" />
       <el-table-column prop="institutionName" label="机构" />
       <el-table-column prop="field" label="研究领域" />
@@ -62,15 +62,21 @@ const filterStatus = ref(null)
 const fetchData = async () => {
   loading.value = true
   try {
+    console.log('开始获取申请列表...')
+    console.log('当前 token:', localStorage.getItem('token'))
     const res = await getPendingApplications({
-      page: page.value,
+      page: page.value - 1,  // Spring Data 分页从0开始
       size,
       status: filterStatus.value
     })
+    console.log('API 返回结果:', res)
+    // request.js 已经转换为 { list, total } 格式
     applications.value = res.data?.list || []
     total.value = res.data?.total || 0
+    console.log('解析后的 applications:', applications.value, '总数:', total.value)
   } catch (error) {
     console.error('获取申请列表失败', error)
+    ElMessage.error('获取申请列表失败: ' + (error.message || '未知错误'))
   } finally {
     loading.value = false
   }

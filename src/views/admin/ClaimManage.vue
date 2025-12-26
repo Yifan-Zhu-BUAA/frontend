@@ -62,10 +62,11 @@ const fetchData = async () => {
   loading.value = true
   try {
     const res = await getPendingClaims({
-      page: page.value,
+      page: page.value - 1,  // Spring Data 分页从0开始
       size,
       status: filterStatus.value
     })
+    // request.js 已经转换为 { list, total } 格式
     claims.value = res.data?.list || []
     total.value = res.data?.total || 0
   } catch (error) {
