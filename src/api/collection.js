@@ -30,9 +30,14 @@ export function removeFromCollection(cid) {
   return request.delete(`/collection/collections/${cid}`)
 }
 
+// 按收藏夹ID和成果ID移除收藏
+export function removeCollectionByWork(fid, achievementId) {
+  return request.delete(`/collection/collections`, { params: { fid, achievementId } })
+}
+
 // 获取某收藏夹内成果列表
 export function getCollectionItems(fid, params) {
-  return request.get(`/collection/favourites/favourites/${fid}/collections`, { params })
+  return request.get(`/collection/favourites/${fid}/collections`, { params })
 }
 
 // 我的所有收藏成果

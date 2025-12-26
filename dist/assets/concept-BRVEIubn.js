@@ -1,0 +1,1 @@
+import{V as t}from"./index-COpeM2_A.js";function o(e){return t.get("/achievements/concepts",{params:e})}function s(e){return t.get(`/achievements/concepts/${e}`)}function r(e,n){return t.get(`/achievements/concepts/${e}/works`,{params:n})}export{s as a,r as b,o as g};

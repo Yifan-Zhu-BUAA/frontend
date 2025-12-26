@@ -5,11 +5,11 @@
     <el-tabs v-model="activeTab">
       <el-tab-pane label="我关注的" name="follows">
         <div class="follows-list" v-loading="loading">
-          <div class="follow-item" v-for="item in follows" :key="item.followId">
+          <div class="follow-item" v-for="item in follows" :key="item.id">
             <el-avatar :size="48">{{ item.name?.charAt(0) }}</el-avatar>
             <div class="follow-info">
               <h4>{{ item.name }}</h4>
-              <p>{{ item.organizationName || item.type }}</p>
+              <p>{{ item.organizationName || '暂无机构信息' }}</p>
             </div>
             <el-button type="danger" plain size="small" @click="handleUnfollow(item)">
               取消关注
@@ -49,8 +49,11 @@ const fans = ref([])
 const fetchFollows = async () => {
   loading.value = true
   try {
-    const res = await getMyFollows({ page: 1, size: 50 })
-    follows.value = res.data?.list || []
+    const res = await getMyFollows({ page: 0, size: 50 })
+    console.log('获取关注列表响应:', res)
+    console.log('关注列表数据:', res.data)
+    follows.value = res.data?.follows || []
+    console.log('处理后的关注列表:', follows.value)
   } catch (error) {
     console.error('获取关注列表失败', error)
   } finally {
@@ -72,9 +75,9 @@ const fetchFans = async () => {
 
 const handleUnfollow = async (item) => {
   try {
-    await unfollow(item.followId)
+    await unfollow(item.id)
     ElMessage.success('已取消关注')
-    follows.value = follows.value.filter(f => f.followId !== item.followId)
+    follows.value = follows.value.filter(f => f.id !== item.id)
   } catch (error) {
     console.error('取消关注失败', error)
   }

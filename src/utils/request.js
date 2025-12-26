@@ -2,6 +2,16 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 
+// 错误码与中文消息映射
+const ERROR_CODE_MAP = {
+  100: '该邮箱已被注册',
+  101: '用户不存在',
+  102: '密码错误',
+  103: '没有操作权限',
+  200: '关注关系不存在',
+  201: '已经关注过该用户',
+}
+
 // 创建 axios 实例
 const request = axios.create({
   baseURL: '/api',
@@ -26,14 +36,14 @@ request.interceptors.request.use(
 )
 
 // 响应拦截器
-request.interceptors.response.use(
-  (response) => {
+request.interceptors.response.use(  (response) => {
     const res = response.data
     
     // 兼容多种响应格式
-    // 格式1: { code: 0, msg: 'success', data: {...} }
+    // 格式1: { code: 0/200, msg/message: 'success', data: {...} }
     if (res.code !== undefined) {
-      if (res.code === 0) {
+      // 兼容 code: 0 和 code: 200 作为成功响应
+      if (res.code === 0 || res.code === 200) {
         // 处理 Spring Data 分页格式转换为统一格式
         if (res.data && res.data.content !== undefined) {
           res.data = {
@@ -43,6 +53,8 @@ request.interceptors.response.use(
             size: res.data.size
           }
         }
+        // 统一 code 为 200
+        res.code = 200
         return res
       }
       // 处理错误响应 (兼容 msg 和 message)
@@ -62,7 +74,20 @@ request.interceptors.response.use(
     // 处理 HTTP 错误
     if (error.response) {
       const status = error.response.status
+      const data = error.response.data
+      
+      // 优先处理后端返回的业务错误码
+      if (data && data.code !== undefined) {
+        const errorMsg = ERROR_CODE_MAP[data.code] || data.message || '操作失败'
+        ElMessage.error(errorMsg)
+        return Promise.reject(new Error(errorMsg))
+      }
+      
+      // 处理 HTTP 状态码错误
       switch (status) {
+        case 400:
+          ElMessage.error(data?.message || '请求参数错误')
+          break
         case 401:
           ElMessage.error('登录已过期，请重新登录')
           localStorage.removeItem('token')
@@ -75,11 +100,14 @@ request.interceptors.response.use(
         case 404:
           ElMessage.error('请求的资源不存在')
           break
+        case 409:
+          ElMessage.error(data?.message || '数据冲突')
+          break
         case 500:
           ElMessage.error('服务器错误')
           break
         default:
-          ElMessage.error(error.response.data?.msg || '请求失败')
+          ElMessage.error(data?.message || data?.msg || '请求失败')
       }
     } else if (error.request) {
       ElMessage.error('网络错误，请检查网络连接')
