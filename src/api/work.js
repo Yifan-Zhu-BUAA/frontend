@@ -24,3 +24,8 @@ export function getWorkCitedBy(workId, params) {
 export function getWorkRelated(workId, params) {
   return request.get(`/achievements/works/${workId}/related`, { params })
 }
+
+// 推荐相关论文
+export function getRecommendedWorks(workId, limit = 10) {
+  return request.get(`/achievements/recommend/works/${workId}`, { params: { limit } })
+}
