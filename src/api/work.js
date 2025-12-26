@@ -24,3 +24,8 @@ export function getWorkCitedBy(workId, params) {
 export function getWorkRelated(workId, params) {
   return request.get(`/achievements/works/${workId}/related`, { params })
 }
+
+// 高级搜索
+export function advancedSearchWorks(searchRequest) {
+  return request.post('/achievements/works/advanced-search', searchRequest)
+}

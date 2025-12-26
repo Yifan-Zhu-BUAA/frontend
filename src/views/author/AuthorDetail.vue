@@ -25,9 +25,13 @@
           </p>
         </div>
         <div class="profile-actions">
-          <el-button type="primary" @click="handleFollow">
+          <el-button v-if="!isFollowed" type="primary" @click="handleFollow">
             <el-icon><Plus /></el-icon>
             关注
+          </el-button>
+          <el-button v-else type="info" plain @click="handleUnfollow">
+            <el-icon><Check /></el-icon>
+            已关注
           </el-button>
         </div>
       </div>
@@ -188,12 +192,14 @@ import {
   getAuthorAwards,
   getAuthorProjects
 } from '@/api/author'
-import { follow } from '@/api/follow'
+import { follow, unfollow, checkFollowStatus, getMyFollows } from '@/api/follow'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
 
 const route = useRoute()
 const router = useRouter()
+const isFollowed = ref(false)
+const followId = ref(null)
 
 const loading = ref(false)
 const tabLoading = ref(false)
@@ -217,6 +223,8 @@ const fetchAuthor = async () => {
   try {
     const res = await getAuthorById(route.params.id)
     author.value = res.data
+    // 检查关注状态
+    await checkFollow()
   } catch (error) {
     console.error('获取学者信息失败', error)
   } finally {
@@ -234,6 +242,28 @@ const fetchWorks = async () => {
     console.error('获取著作失败', error)
   } finally {
     tabLoading.value = false
+  }
+}
+
+const checkFollow = async () => {
+  try {
+    const res = await checkFollowStatus(route.params.id)
+    console.log('检查关注状态响应:', res)
+    isFollowed.value = res.data?.isFollowed || false
+    // 如果已关注，获取followId
+    if (isFollowed.value) {
+      const followsRes = await getMyFollows({ page: 0, size: 100 })
+      console.log('获取关注列表响应:', followsRes)
+      const followList = followsRes.data?.follows || []
+      // 使用 authorId 匹配
+      const currentFollow = followList.find(f => f.authorId === route.params.id)
+      console.log('当前作者ID:', route.params.id, '匹配到的关注:', currentFollow)
+      if (currentFollow) {
+        followId.value = currentFollow.id
+      }
+    }
+  } catch (error) {
+    console.error('检查关注状态失败', error)
   }
 }
 
@@ -288,10 +318,36 @@ const fetchProjects = async () => {
 
 const handleFollow = async () => {
   try {
-    await follow({ idTo: route.params.id, type: 'author' })
+    await follow({ 
+      idTo: route.params.id, 
+      type: 'author',
+      authorName: author.value?.name,
+      authorInst: author.value?.organizationName
+    })
     ElMessage.success('关注成功')
+    isFollowed.value = true
+    await checkFollow()
   } catch (error) {
     console.error('关注失败', error)
+    ElMessage.error('关注失败')
+  }
+}
+
+const handleUnfollow = async () => {
+  try {
+    if (!followId.value) {
+      // 如果没有followId，先获取
+      await checkFollow()
+    }
+    if (followId.value) {
+      await unfollow(followId.value)
+      ElMessage.success('已取消关注')
+      isFollowed.value = false
+      followId.value = null
+    }
+  } catch (error) {
+    console.error('取消关注失败', error)
+    ElMessage.error('取消关注失败')
   }
 }
 

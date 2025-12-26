@@ -30,13 +30,18 @@ const routes = [
         name: 'AuthorDetail',
         component: () => import('@/views/author/AuthorDetail.vue'),
         meta: { title: '学者详情' }
-      },
-      // 著作相关
+      },      // 著作相关
       {
         path: 'works',
         name: 'Works',
         component: () => import('@/views/work/WorkList.vue'),
         meta: { title: '著作列表' }
+      },
+      {
+        path: 'works/advanced-search',
+        name: 'WorkAdvancedSearch',
+        component: () => import('@/views/work/WorkAdvancedSearch.vue'),
+        meta: { title: '高级搜索' }
       },
       {
         path: 'works/:id',
@@ -126,6 +131,20 @@ const routes = [
             meta: { title: '我的申请' }
           },
         ]
+      },
+      // 用户信息页面（查看其他用户）
+      {
+        path: 'user/:id',
+        name: 'OtherUserProfile',
+        component: () => import('@/views/user/UserProfile.vue'),
+        meta: { title: '用户信息' }
+      },
+      // 私信聊天
+      {
+        path: 'chat/:id?',
+        name: 'Chat',
+        component: () => import('@/views/message/Chat.vue'),
+        meta: { requiresAuth: true, title: '私信' }
       },
       // 管理员
       {

@@ -163,7 +163,14 @@
 
     <!-- 评论区 -->
     <div class="work-comments card" v-if="work">
-      <h3 class="section-title">评论 ({{ commentsTotal }})</h3>
+      <div class="comments-header">
+        <h3 class="section-title">评论 ({{ commentsTotal }})</h3>
+        <!-- 排序选择器 -->
+        <el-select v-model="commentSort" placeholder="排序方式" size="small" @change="handleSortChange">
+          <el-option label="按时间排序" value="time" />
+          <el-option label="按点赞数排序" value="likes" />
+        </el-select>
+      </div>
       
       <!-- 发表评论 -->
       <div class="comment-form" v-if="userStore.isLoggedIn">
@@ -184,22 +191,105 @@
       <!-- 评论列表 -->
       <div class="comments-list" v-loading="commentsLoading">
         <div class="comment-item" v-for="comment in comments" :key="comment.commentId">
-          <el-avatar :size="40">{{ comment.userNickname?.charAt(0) }}</el-avatar>
+          <el-avatar 
+            :size="40" 
+            class="clickable-avatar"
+            @click="viewUserProfile(comment.userId)"
+          >
+            {{ comment.nickname?.charAt(0) }}
+          </el-avatar>
           <div class="comment-content">
             <div class="comment-header">
-              <span class="user-name">{{ comment.userNickname }}</span>
+              <span class="user-name clickable" @click="viewUserProfile(comment.userId)">
+                {{ comment.nickname }}
+              </span>
               <span class="comment-time">{{ formatDate(comment.commentTime) }}</span>
+            </div>
+            <!-- 如果是回复其他评论，显示被回复的评论信息 -->
+            <div class="parent-comment" v-if="comment.parentCommentId">
+              <span class="reply-to">回复 @{{ comment.parentNickname }}：</span>
+              <span class="parent-content">{{ truncateText(comment.parentContent, 50) }}</span>
             </div>
             <p class="comment-text">{{ comment.content }}</p>
             <div class="comment-actions">
-              <el-button text size="small" @click="handleLike(comment)">
+              <el-button 
+                text 
+                size="small" 
+                @click="handleLike(comment)"
+                :class="{ 'is-liked': comment.isLiked }"
+              >
                 <el-icon><CaretTop /></el-icon>
                 {{ comment.likes || 0 }}
               </el-button>
-              <el-button text size="small">
+              <el-button text size="small" @click="handleReply(comment)">
                 <el-icon><ChatLineRound /></el-icon>
-                回复 ({{ comment.replyCount || 0 }})
+                回复
               </el-button>
+              <el-button 
+                text 
+                size="small" 
+                @click="toggleReplies(comment)"
+                v-if="comment.replyCount > 0"
+              >
+                <el-icon><ArrowDown v-if="!comment.showReplies" /><ArrowUp v-else /></el-icon>
+                {{ comment.showReplies ? '收起回复' : `查看回复 (${comment.replyCount})` }}
+              </el-button>
+            </div>
+            <!-- 回复输入框 -->
+            <div class="reply-form" v-if="replyingTo === comment.commentId">
+              <el-input
+                v-model="replyContent"
+                type="textarea"
+                :rows="2"
+                :placeholder="'回复 ' + comment.nickname + '...'"
+              />
+              <div class="reply-actions">
+                <el-button size="small" @click="cancelReply">取消</el-button>
+                <el-button type="primary" size="small" @click="submitReply(comment)" :loading="submittingReply">
+                  发送
+                </el-button>
+              </div>
+            </div>
+            <!-- 回复列表 -->
+            <div class="replies-list" v-if="comment.showReplies && comment.replies?.length">
+              <div class="reply-item" v-for="reply in comment.replies" :key="reply.commentId">
+                <el-avatar 
+                  :size="32" 
+                  class="clickable-avatar"
+                  @click="viewUserProfile(reply.userId)"
+                >
+                  {{ reply.nickname?.charAt(0) }}
+                </el-avatar>
+                <div class="reply-content">
+                  <div class="reply-header">
+                    <span class="user-name clickable" @click="viewUserProfile(reply.userId)">
+                      {{ reply.nickname }}
+                    </span>
+                    <span class="reply-time">{{ formatDate(reply.commentTime) }}</span>
+                  </div>
+                  <!-- 如果回复的是其他回复，显示被回复评论信息 -->
+                  <div class="parent-comment" v-if="reply.parentCommentId && reply.parentNickname">
+                    <span class="reply-to">回复 @{{ reply.parentNickname }}：</span>
+                    <span class="parent-content">{{ truncateText(reply.parentContent, 50) }}</span>
+                  </div>
+                  <p class="reply-text">{{ reply.content }}</p>
+                  <div class="reply-actions">
+                    <el-button 
+                      text 
+                      size="small" 
+                      @click="handleLike(reply)"
+                      :class="{ 'is-liked': reply.isLiked }"
+                    >
+                      <el-icon><CaretTop /></el-icon>
+                      {{ reply.likes || 0 }}
+                    </el-button>
+                    <el-button text size="small" @click="handleReplyToReply(comment, reply)">
+                      <el-icon><ChatLineRound /></el-icon>
+                      回复
+                    </el-button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -211,16 +301,17 @@
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { getWorkById, getWorkReferences, getWorkCitedBy, getWorkRelated } from '@/api/work'
-import { getComments, createComment, likeComment } from '@/api/comment'
+import { getComments, createComment, likeComment, unlikeComment, getCommentReplies } from '@/api/comment'
 import { addToCollection, getFavourites } from '@/api/collection'
 import { addHistory } from '@/api/collection'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 
 const loading = ref(false)
@@ -237,6 +328,12 @@ const comments = ref([])
 const commentsTotal = ref(0)
 const commentContent = ref('')
 const submitting = ref(false)
+// 回复相关
+const replyingTo = ref(null)
+const replyContent = ref('')
+const submittingReply = ref(false)
+// 排序相关
+const commentSort = ref('time')
 
 const fetchWork = async () => {
   loading.value = true
@@ -299,8 +396,8 @@ const fetchRelated = async () => {
 const fetchComments = async () => {
   commentsLoading.value = true
   try {
-    const res = await getComments(route.params.id, { page: 1, size: 20 })
-    comments.value = res.data?.list || []
+    const res = await getComments(route.params.id, { page: 1, size: 20, sort: commentSort.value })
+    comments.value = (res.data?.list || []).map(c => ({ ...c, showReplies: false, replies: [] }))
     commentsTotal.value = res.data?.total || 0
   } catch (error) {
     console.error('获取评论失败', error)
@@ -369,11 +466,126 @@ const handleLike = async (comment) => {
   }
 
   try {
-    await likeComment(comment.commentId)
-    comment.likes = (comment.likes || 0) + 1
+    if (comment.isLiked) {
+      // 取消点赞
+      await unlikeComment(comment.commentId)
+      comment.likes = Math.max(0, (comment.likes || 0) - 1)
+      comment.isLiked = false
+    } else {
+      // 点赞
+      await likeComment(comment.commentId)
+      comment.likes = (comment.likes || 0) + 1
+      comment.isLiked = true
+    }
   } catch (error) {
-    console.error('点赞失败', error)
+    console.error('操作失败', error)
   }
+}
+
+// 排序变化处理
+const handleSortChange = () => {
+  fetchComments()
+}
+
+// 截取文本
+const truncateText = (text, maxLength) => {
+  if (!text) return ''
+  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+}
+
+// 切换显示回复列表
+const toggleReplies = async (comment) => {
+  if (comment.showReplies) {
+    comment.showReplies = false
+  } else {
+    // 加载回复
+    try {
+      const res = await getCommentReplies(comment.commentId, { page: 1, size: 50 })
+      comment.replies = res.data?.list || []
+      comment.showReplies = true
+    } catch (error) {
+      console.error('获取回复失败', error)
+      ElMessage.error('获取回复失败')
+    }
+  }
+}
+
+// 处理回复按钮点击
+const handleReply = (comment) => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  
+  // 如果点击的是同一个评论，则关闭回复框
+  if (replyingTo.value === comment.commentId) {
+    replyingTo.value = null
+    replyContent.value = ''
+  } else {
+    replyingTo.value = comment.commentId
+    replyContent.value = ''
+  }
+}
+
+// 取消回复
+const cancelReply = () => {
+  replyingTo.value = null
+  replyContent.value = ''
+}
+
+// 提交回复
+// 提交回复
+const submitReply = async (parentComment) => {
+  if (!replyContent.value.trim()) {
+    ElMessage.warning('请输入回复内容')
+    return
+  }
+
+  submittingReply.value = true
+  try {
+    await createComment({
+      achievementId: route.params.id,
+      content: replyContent.value.trim(),
+      parentCommentId: parentComment.commentId
+    })
+    ElMessage.success('回复成功')
+    replyContent.value = ''
+    replyingTo.value = null
+    // 更新父评论的回复数
+    parentComment.replyCount = (parentComment.replyCount || 0) + 1
+    // 如果回复列表已展开，刷新回复列表
+    if (parentComment.showReplies) {
+      try {
+        const res = await getCommentReplies(parentComment.commentId, { page: 1, size: 50 })
+        parentComment.replies = res.data?.list || []
+      } catch (error) {
+        console.error('刷新回复列表失败', error)
+      }
+    }
+  } catch (error) {
+    console.error('回复失败', error)
+    ElMessage.error('回复失败，请重试')
+  } finally {
+    submittingReply.value = false
+  }
+}
+
+// 回复某条回复
+const handleReplyToReply = (parentComment, reply) => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  
+  // 回复的目标是顶层评论，但要显示被回复的用户名
+  replyingTo.value = parentComment.commentId
+  replyContent.value = `@${reply.nickname} `
+}
+
+// 查看用户资料
+const viewUserProfile = (userId) => {
+  if (!userId) return
+  router.push(`/user/${userId}`)
 }
 
 const getTypeLabel = (type) => {
@@ -607,11 +819,35 @@ onMounted(() => {
     margin-bottom: 20px;
   }
 
+  .comments-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+
+    .section-title {
+      margin-bottom: 0;
+    }
+
+    .el-select {
+      width: 140px;
+    }
+  }
+
   .comment-form {
     margin-bottom: 24px;
 
     .el-button {
       margin-top: 12px;
+    }
+  }
+
+  .clickable-avatar {
+    cursor: pointer;
+    transition: opacity 0.2s;
+
+    &:hover {
+      opacity: 0.8;
     }
   }
 
@@ -648,10 +884,37 @@ onMounted(() => {
         .user-name {
           font-weight: 500;
           color: var(--text-primary);
+          
+          &.clickable {
+            cursor: pointer;
+            
+            &:hover {
+              color: var(--primary-color);
+            }
+          }
         }
 
         .comment-time {
           font-size: 12px;
+          color: var(--text-secondary);
+        }
+      }
+
+      .parent-comment {
+        background: var(--bg-light);
+        padding: 8px 12px;
+        border-radius: var(--radius-sm);
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        border-left: 3px solid var(--primary-color);
+
+        .reply-to {
+          color: var(--primary-color);
+          font-weight: 500;
+        }
+
+        .parent-content {
           color: var(--text-secondary);
         }
       }
@@ -666,6 +929,97 @@ onMounted(() => {
       .comment-actions {
         display: flex;
         gap: 16px;
+
+        .is-liked {
+          color: var(--primary-color);
+        }
+      }
+
+      .reply-form {
+        margin-top: 12px;
+        padding: 12px;
+        background: var(--bg-light);
+        border-radius: var(--radius-md);
+
+        .reply-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 8px;
+        }
+      }
+
+      .replies-list {
+        margin-top: 12px;
+        padding-left: 12px;
+        border-left: 2px solid var(--border-lighter);
+
+        .reply-item {
+          display: flex;
+          gap: 10px;
+          padding: 10px 0;
+
+          &:not(:last-child) {
+            border-bottom: 1px solid var(--border-lighter);
+          }
+
+          .reply-content {
+            flex: 1;
+
+            .reply-header {
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              margin-bottom: 6px;
+
+              .user-name {
+                font-weight: 500;
+                font-size: 13px;
+                color: var(--text-primary);
+              }
+
+              .reply-time {
+                font-size: 11px;
+                color: var(--text-secondary);
+              }
+            }
+
+            .parent-comment {
+              background: var(--bg-light);
+              padding: 6px 10px;
+              border-radius: var(--radius-sm);
+              margin-bottom: 6px;
+              font-size: 12px;
+              color: var(--text-secondary);
+              border-left: 2px solid var(--primary-color);
+
+              .reply-to {
+                color: var(--primary-color);
+                font-weight: 500;
+              }
+
+              .parent-content {
+                color: var(--text-secondary);
+              }
+            }
+
+            .reply-text {
+              font-size: 13px;
+              color: var(--text-regular);
+              line-height: 1.5;
+              margin-bottom: 6px;
+            }
+
+            .reply-actions {
+              display: flex;
+              gap: 12px;
+
+              .is-liked {
+                color: var(--primary-color);
+              }
+            }
+          }
+        }
       }
     }
   }
