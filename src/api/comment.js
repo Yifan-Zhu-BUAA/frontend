@@ -5,6 +5,11 @@ export function getComments(achievementId, params) {
   return request.get(`/social/achievements/${achievementId}/comments`, { params })
 }
 
+// 获取评论的回复列表
+export function getCommentReplies(commentId, params) {
+  return request.get(`/social/comments/${commentId}/replies`, { params })
+}
+
 // 发表评论
 export function createComment(data) {
   return request.post('/social/comments', data)

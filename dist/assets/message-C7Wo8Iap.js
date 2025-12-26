@@ -1,0 +1,1 @@
+import{V as s}from"./index-COpeM2_A.js";function t(e){return s.get("/social/messages",{params:e})}function r(e){return s.put(`/social/messages/${e}/read`)}function n(){return s.get("/social/messages/unread-count")}export{t as a,n as g,r as m};

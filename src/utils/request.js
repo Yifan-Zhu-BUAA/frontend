@@ -36,14 +36,14 @@ request.interceptors.request.use(
 )
 
 // 响应拦截器
-request.interceptors.response.use(
-  (response) => {
+request.interceptors.response.use(  (response) => {
     const res = response.data
     
     // 兼容多种响应格式
-    // 格式1: { code: 0, msg: 'success', data: {...} }
+    // 格式1: { code: 0/200, msg/message: 'success', data: {...} }
     if (res.code !== undefined) {
-      if (res.code === 0) {
+      // 兼容 code: 0 和 code: 200 作为成功响应
+      if (res.code === 0 || res.code === 200) {
         // 处理 Spring Data 分页格式转换为统一格式
         if (res.data && res.data.content !== undefined) {
           res.data = {
@@ -53,6 +53,8 @@ request.interceptors.response.use(
             size: res.data.size
           }
         }
+        // 统一 code 为 200
+        res.code = 200
         return res
       }
       // 处理错误响应 (兼容 msg 和 message)

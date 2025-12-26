@@ -5,9 +5,7 @@
       <div class="logo" @click="router.push('/')">
         <el-icon :size="28" color="#4A90E2"><Reading /></el-icon>
         <span class="logo-text">学术成果分享平台</span>
-      </div>
-
-      <!-- 搜索框 -->
+      </div>      <!-- 搜索框 -->
       <div class="search-box">
         <el-input
           v-model="searchKeyword"
@@ -25,6 +23,14 @@
             </el-button>
           </template>
         </el-input>
+        <el-tooltip content="高级搜索" placement="bottom">
+          <el-button 
+            class="advanced-search-btn" 
+            @click="router.push('/works/advanced-search')"
+            :icon="Filter"
+            circle
+          />
+        </el-tooltip>
       </div>
 
       <!-- 导航菜单 -->
@@ -107,15 +113,19 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { Filter } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
-import { getUnreadCount } from '@/api/message'
+import { useMessageStore } from '@/stores/message'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const messageStore = useMessageStore()
 
 const searchKeyword = ref('')
-const unreadCount = ref(0)
+
+// 使用 store 中的未读数量
+const unreadCount = computed(() => messageStore.unreadCount)
 
 const activeMenu = computed(() => {
   const path = route.path
@@ -155,18 +165,10 @@ const handleCommand = (command) => {
   }
 }
 
-const fetchUnreadCount = async () => {
-  if (!userStore.isLoggedIn) return
-  try {
-    const res = await getUnreadCount()
-    unreadCount.value = res.data || 0
-  } catch (error) {
-    console.error('获取未读消息数失败', error)
-  }
-}
-
 onMounted(() => {
-  fetchUnreadCount()
+  if (userStore.isLoggedIn) {
+    messageStore.refreshUnreadCount()
+  }
 })
 </script>
 
@@ -212,6 +214,9 @@ onMounted(() => {
 .search-box {
   flex: 1;
   max-width: 480px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 
   :deep(.el-input-group__append) {
     background-color: var(--primary-color);
@@ -220,6 +225,10 @@ onMounted(() => {
     .el-button {
       color: #fff;
     }
+  }
+
+  .advanced-search-btn {
+    flex-shrink: 0;
   }
 }
 

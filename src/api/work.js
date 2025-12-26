@@ -29,3 +29,8 @@ export function getWorkRelated(workId, params) {
 export function getRecommendedWorks(workId, limit = 10) {
   return request.get(`/achievements/recommend/works/${workId}`, { params: { limit } })
 }
+
+// 高级搜索
+export function advancedSearchWorks(searchRequest) {
+  return request.post('/achievements/works/advanced-search', searchRequest)
+}
