@@ -34,3 +34,8 @@ export function getAuthorProjects(authorId, params) {
 export function getAuthorCoauthors(authorId, params) {
   return request.get(`/achievements/authors/${authorId}/coauthors`, { params })
 }
+
+// 推荐相关学者
+export function getRecommendedAuthors(authorId, limit = 10) {
+  return request.get(`/achievements/recommend/authors/${authorId}`, { params: { limit } })
+}

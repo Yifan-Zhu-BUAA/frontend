@@ -93,7 +93,7 @@
                 class="coauthor-item card" 
                 v-for="coauthor in coauthors" 
                 :key="coauthor.coauthorId"
-                @click="router.push(`/authors/${coauthor.coauthorId}`)"
+                @click="goToAuthor(coauthor.coauthorId)"
               >
                 <el-avatar :size="48">{{ coauthor.name?.charAt(0) }}</el-avatar>
                 <div class="coauthor-info">
@@ -171,6 +171,35 @@
             <el-empty v-else description="暂无项目" />
           </div>
         </el-tab-pane>
+
+        <!-- 相似学者 -->
+        <el-tab-pane label="相似学者" name="similar">
+          <template #label>
+            <span><el-icon><UserFilled /></el-icon> 相似学者</span>
+          </template>
+          <div class="tab-content" v-loading="similarLoading">
+            <div class="similar-authors-list" v-if="similarAuthors.length">
+              <div 
+                class="similar-author-item card" 
+                v-for="similar in similarAuthors" 
+                :key="similar.id"
+                @click="goToAuthor(similar.id)"
+              >
+                <el-avatar :size="48">{{ similar.name?.charAt(0) }}</el-avatar>
+                <div class="similar-author-info">
+                  <h4>{{ similar.name }}</h4>
+                  <p class="org">{{ similar.organizationName || '暂无机构信息' }}</p>
+                  <div class="stats">
+                    <span><el-icon><Document /></el-icon> {{ similar.worksCount || 0 }} 著作</span>
+                    <span><el-icon><Reading /></el-icon> {{ formatNumber(similar.cited) }} 引用</span>
+                    <span class="h-index">H: {{ similar.hIndex || similar.hindex || 0 }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <el-empty v-else description="暂无相似学者推荐" />
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </div>
   </div>
@@ -186,7 +215,8 @@ import {
   getAuthorCoauthors,
   getAuthorPatents,
   getAuthorAwards,
-  getAuthorProjects
+  getAuthorProjects,
+  getRecommendedAuthors
 } from '@/api/author'
 import { follow } from '@/api/follow'
 import { ElMessage } from 'element-plus'
@@ -211,6 +241,10 @@ const coauthorsTotal = ref(0)
 const patents = ref([])
 const awards = ref([])
 const projects = ref([])
+
+// 相似学者
+const similarAuthors = ref([])
+const similarLoading = ref(false)
 
 const fetchAuthor = async () => {
   loading.value = true
@@ -286,6 +320,19 @@ const fetchProjects = async () => {
   }
 }
 
+// 获取相似学者推荐
+const fetchSimilarAuthors = async () => {
+  similarLoading.value = true
+  try {
+    const res = await getRecommendedAuthors(route.params.id, 12)
+    similarAuthors.value = res.data || []
+  } catch (error) {
+    console.error('获取相似学者失败', error)
+  } finally {
+    similarLoading.value = false
+  }
+}
+
 const handleFollow = async () => {
   try {
     await follow({ idTo: route.params.id, type: 'author' })
@@ -344,6 +391,39 @@ watch(activeTab, (tab) => {
     case 'projects':
       if (!projects.value.length) fetchProjects()
       break
+    case 'similar':
+      if (!similarAuthors.value.length) fetchSimilarAuthors()
+      break
+  }
+})
+
+// 跳转到学者页面并刷新数据
+const goToAuthor = (authorId) => {
+  if (authorId === route.params.id) return
+  router.push(`/authors/${authorId}`)
+}
+
+// 监听路由参数变化，重新加载数据
+watch(() => route.params.id, (newId, oldId) => {
+  if (newId && newId !== oldId) {
+    // 重置所有数据
+    author.value = null
+    works.value = []
+    worksPage.value = 1
+    worksTotal.value = 0
+    coauthors.value = []
+    coauthorsPage.value = 1
+    coauthorsTotal.value = 0
+    patents.value = []
+    awards.value = []
+    projects.value = []
+    similarAuthors.value = []
+    activeTab.value = 'works'
+    
+    // 重新加载数据
+    fetchAuthor()
+    fetchWorks()
+    fetchCoauthors()
   }
 })
 
@@ -532,6 +612,73 @@ onMounted(() => {
       }
     }
   }
+
+  // 相似学者列表样式
+  .similar-authors-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .similar-author-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .similar-author-info {
+      flex: 1;
+      min-width: 0;
+
+      h4 {
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .org {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .stats {
+        display: flex;
+        gap: 12px;
+        font-size: 12px;
+        color: var(--text-regular);
+
+        span {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+
+          .el-icon {
+            font-size: 14px;
+          }
+        }
+
+        .h-index {
+          font-weight: 600;
+          color: var(--primary-color);
+        }
+      }
+    }
+  }
 }
 
 @media (max-width: 1200px) {
@@ -542,7 +689,8 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 
-  .author-tabs .coauthors-list {
+  .author-tabs .coauthors-list,
+  .author-tabs .similar-authors-list {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -557,7 +705,8 @@ onMounted(() => {
     justify-content: center;
   }
 
-  .author-tabs .coauthors-list {
+  .author-tabs .coauthors-list,
+  .author-tabs .similar-authors-list {
     grid-template-columns: 1fr;
   }
 }
