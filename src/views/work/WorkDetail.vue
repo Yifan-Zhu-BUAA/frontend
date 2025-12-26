@@ -5,9 +5,9 @@
       <div class="work-header">
         <el-tag type="primary" size="large">{{ getTypeLabel(work.type) }}</el-tag>
         <div class="work-actions">
-          <el-button @click="handleCollect">
-            <el-icon><Star /></el-icon>
-            收藏
+          <el-button @click="handleCollect" :type="isCollected ? 'warning' : 'default'">
+            <el-icon><StarFilled v-if="isCollected" /><Star v-else /></el-icon>
+            {{ isCollected ? '已收藏' : '收藏' }}
           </el-button>
         </div>
       </div>
@@ -206,6 +206,26 @@
         <el-empty v-if="!comments.length" description="暂无评论" />
       </div>
     </div>
+
+    <!-- 收藏夹选择对话框 -->
+    <el-dialog v-model="showFavDialog" title="管理收藏" width="400px">
+      <div class="fav-dialog-hint">选择要收藏到的收藏夹（可多选）</div>
+      <el-checkbox-group v-model="selectedFids" class="fav-checkbox-group">
+        <el-checkbox 
+          v-for="fav in favouritesList" 
+          :key="fav.fid" 
+          :value="fav.fid"
+          class="fav-checkbox-item"
+        >
+          <span class="fav-name">{{ fav.fName }}</span>
+          <span class="fav-count">({{ fav.count || 0 }})</span>
+        </el-checkbox>
+      </el-checkbox-group>
+      <template #footer>
+        <el-button @click="showFavDialog = false">取消</el-button>
+        <el-button type="primary" @click="confirmCollect" :loading="collectLoading">确认</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -215,7 +235,7 @@ import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { getWorkById, getWorkReferences, getWorkCitedBy, getWorkRelated } from '@/api/work'
 import { getComments, createComment, likeComment } from '@/api/comment'
-import { addToCollection, getFavourites } from '@/api/collection'
+import { addToCollection, getFavourites, getMyCollections, removeCollectionByWork } from '@/api/collection'
 import { addHistory } from '@/api/collection'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
@@ -225,6 +245,15 @@ const userStore = useUserStore()
 
 const loading = ref(false)
 const work = ref(null)
+const isCollected = ref(false)
+const collectedFids = ref([])  // 记录已收藏到的收藏夹ID列表
+
+// 收藏夹选择对话框
+const showFavDialog = ref(false)
+const favouritesList = ref([])
+const selectedFids = ref([])  // 多选的收藏夹ID列表
+const originalFids = ref([])  // 记录打开对话框时的原始选择
+const collectLoading = ref(false)
 
 const refTab = ref('references')
 const refLoading = ref(false)
@@ -252,11 +281,32 @@ const fetchWork = async () => {
         publisher: work.value.journal,
         publishTime: work.value.publishTime
       }).catch(() => {})
+      
+      // 检查是否已收藏
+      checkCollectionStatus()
     }
   } catch (error) {
     console.error('获取著作信息失败', error)
   } finally {
     loading.value = false
+  }
+}
+
+// 检查该著作是否已被收藏（到哪些收藏夹）
+const checkCollectionStatus = async () => {
+  try {
+    const res = await getMyCollections({ size: 1000 })
+    const collections = res.data?.list || []
+    // 找出该著作被收藏到的所有收藏夹
+    const fids = collections
+      .filter(c => c.achievementId === route.params.id)
+      .map(c => c.fid)
+      .filter(fid => fid != null)
+    
+    collectedFids.value = fids
+    isCollected.value = fids.length > 0
+  } catch (error) {
+    // 忽略错误，保持默认未收藏状态
   }
 }
 
@@ -315,28 +365,70 @@ const handleCollect = async () => {
     return
   }
 
+  // 获取收藏夹列表并显示对话框
   try {
-    // 获取收藏夹列表
     const res = await getFavourites()
-    const favourites = res.data || []
+    favouritesList.value = res.data || []
 
-    if (!favourites.length) {
+    if (!favouritesList.value.length) {
       ElMessage.info('请先创建收藏夹')
       return
     }
 
-    // 简单选择第一个收藏夹
-    await addToCollection({
-      fid: favourites[0].fid,
-      achievementId: work.value.workId,
-      title: work.value.title,
-      authors: work.value.authorNames,
-      journal: work.value.journal,
-      date: work.value.publishTime
-    })
-    ElMessage.success('收藏成功')
+    // 设置当前已收藏的收藏夹为选中状态
+    selectedFids.value = [...collectedFids.value]
+    originalFids.value = [...collectedFids.value]
+    showFavDialog.value = true
   } catch (error) {
-    console.error('收藏失败', error)
+    console.error('获取收藏夹失败', error)
+  }
+}
+
+// 确认收藏变更
+const confirmCollect = async () => {
+  collectLoading.value = true
+  try {
+    // 计算需要新增的收藏夹
+    const toAdd = selectedFids.value.filter(fid => !originalFids.value.includes(fid))
+    // 计算需要移除的收藏夹
+    const toRemove = originalFids.value.filter(fid => !selectedFids.value.includes(fid))
+
+    // 执行新增
+    for (const fid of toAdd) {
+      await addToCollection({
+        fid,
+        achievementId: work.value.workId,
+        title: work.value.title,
+        authors: work.value.authorNames,
+        journal: work.value.journal,
+        date: work.value.publishTime
+      })
+    }
+
+    // 执行移除
+    for (const fid of toRemove) {
+      await removeCollectionByWork(fid, work.value.workId)
+    }
+
+    // 更新状态
+    collectedFids.value = [...selectedFids.value]
+    isCollected.value = selectedFids.value.length > 0
+    showFavDialog.value = false
+
+    if (toAdd.length > 0 && toRemove.length > 0) {
+      ElMessage.success('收藏已更新')
+    } else if (toAdd.length > 0) {
+      ElMessage.success(`已添加到 ${toAdd.length} 个收藏夹`)
+    } else if (toRemove.length > 0) {
+      ElMessage.success(`已从 ${toRemove.length} 个收藏夹移除`)
+    } else {
+      showFavDialog.value = false
+    }
+  } catch (error) {
+    console.error('操作失败', error)
+    ElMessage.error('操作失败')
+  } finally {
+    collectLoading.value = false
   }
 }
 
@@ -667,6 +759,61 @@ onMounted(() => {
         display: flex;
         gap: 16px;
       }
+    }
+  }
+}
+
+.fav-dialog-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.fav-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 8px;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+
+  .fav-checkbox-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color-light);
+    transition: all 0.2s;
+    margin: 0;
+    height: auto;
+
+    &:hover {
+      background-color: var(--bg-color-page);
+      border-color: var(--color-primary-light-5);
+    }
+
+    .fav-name {
+      margin-right: 8px;
+      font-weight: 500;
+    }
+
+    .fav-count {
+      color: var(--text-secondary);
+      font-size: 12px;
     }
   }
 }
