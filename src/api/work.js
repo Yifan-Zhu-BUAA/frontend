@@ -30,6 +30,15 @@ export function getRecommendedWorks(workId, limit = 10) {
   return request.get(`/achievements/recommend/works/${workId}`, { params: { limit } })
 }
 
+// 为用户推荐论文（个性化推荐）
+export function getRecommendedWorksForUser(limit = 10, refresh = null) {
+  const params = { limit }
+  if (refresh !== null) {
+    params.refresh = refresh
+  }
+  return request.get('/achievements/recommend/user/works', { params })
+}
+
 // 高级搜索
 export function advancedSearchWorks(searchRequest) {
   return request.post('/achievements/works/advanced-search', searchRequest)

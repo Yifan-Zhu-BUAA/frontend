@@ -28,6 +28,18 @@ request.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    // 添加用户ID到请求头（用于个性化推荐等功能）
+    const userInfoStr = localStorage.getItem('userInfo')
+    if (userInfoStr) {
+      try {
+        const userInfo = JSON.parse(userInfoStr)
+        if (userInfo && userInfo.uid) {
+          config.headers.uid = userInfo.uid
+        }
+      } catch (e) {
+        console.warn('解析用户信息失败:', e)
+      }
+    }
     return config
   },
   (error) => {
