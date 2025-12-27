@@ -48,3 +48,13 @@ export function getRecommendedAuthorsForUser(limit = 10, refresh = null) {
   }
   return request.get('/achievements/recommend/user/authors', { params })
 }
+
+// 获取学者引用趋势
+export function getCitationTrends(authorId) {
+  return request.get(`/achievements/authors/${authorId}/citation-trends`)
+}
+
+// 获取学者研究领域分布
+export function getFieldDistribution(authorId) {
+  return request.get(`/achievements/authors/${authorId}/field-distribution`)
+}

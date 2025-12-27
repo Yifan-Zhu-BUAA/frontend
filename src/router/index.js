@@ -88,6 +88,13 @@ const routes = [
         component: () => import('@/views/patent/PatentDetail.vue'),
         meta: { title: '专利详情' }
       },
+      // 个人门户（独立页面）
+      {
+        path: 'user/dashboard',
+        name: 'UserDashboard',
+        component: () => import('@/views/user/Dashboard.vue'),
+        meta: { requiresAuth: true, title: '个人门户' }
+      },
       // 用户中心
       {
         path: 'user',
@@ -95,7 +102,7 @@ const routes = [
         meta: { requiresAuth: true },
         children: [
           {
-            path: '',
+            path: 'profile',
             name: 'UserProfile',
             component: () => import('@/views/user/Profile.vue'),
             meta: { title: '个人资料' }
