@@ -76,9 +76,13 @@
             </div>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item command="dashboard">
+                  <el-icon><DataBoard /></el-icon>
+                  个人门户
+                </el-dropdown-item>
                 <el-dropdown-item command="profile">
                   <el-icon><User /></el-icon>
-                  个人中心
+                  个人资料
                 </el-dropdown-item>
                 <el-dropdown-item command="collections">
                   <el-icon><Star /></el-icon>
@@ -147,8 +151,11 @@ const handleSearch = () => {
 
 const handleCommand = (command) => {
   switch (command) {
+    case 'dashboard':
+      router.push('/user/dashboard')
+      break
     case 'profile':
-      router.push('/user')
+      router.push('/user/profile')
       break
     case 'collections':
       router.push('/user/collections')
