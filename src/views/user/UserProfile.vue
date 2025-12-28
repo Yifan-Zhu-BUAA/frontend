@@ -2,23 +2,30 @@
   <div class="user-profile-page">
     <div class="profile-container card" v-loading="loading">
       <template v-if="userInfo">
+        <!-- 右上角前往学者页按钮 -->
+        <div v-if="userInfo.authorId" class="top-right-btn">
+          <el-button type="primary" size="small" @click="goToAuthorPage">前往学者页</el-button>
+        </div>
+        
         <!-- 用户头部信息 -->
         <div class="profile-header">
-          <el-avatar :size="100" :src="userInfo.avatar">
+          <el-avatar :size="100" :src="userInfo.avatar" class="user-avatar">
             {{ userInfo.nickname?.charAt(0) }}
           </el-avatar>
+          
           <div class="profile-info">
             <h2 class="user-nickname">{{ userInfo.nickname }}</h2>
             <div class="user-meta">
-              <span v-if="userInfo.fields">
+              <span v-if="userInfo.fields" class="meta-item">
                 <el-icon><Briefcase /></el-icon>
                 {{ userInfo.fields }}
               </span>
-              <span v-if="userInfo.email">
+              <span v-if="userInfo.email" class="meta-item">
                 <el-icon><Message /></el-icon>
                 {{ userInfo.email }}
               </span>
             </div>
+            
             <div class="user-stats">
               <div class="stat-item">
                 <span class="stat-value">{{ userInfo.followsCount || 0 }}</span>
@@ -29,14 +36,21 @@
                 <span class="stat-label">粉丝</span>
               </div>
             </div>
+            
             <!-- 操作按钮 -->
             <div class="profile-actions" v-if="!isCurrentUser">
               <el-button type="primary" @click="startChat" v-if="canSendMessage">
                 <el-icon><ChatDotRound /></el-icon>
                 发私信
               </el-button>
-              <el-button @click="handleFollow" v-if="userInfo.authorId">
-                {{ isFollowed ? '取消关注' : '关注' }}
+              <!-- 关注按钮 -->
+              <el-button
+                :type="isFollowed ? 'info' : 'primary'"
+                :plain="isFollowed"
+                :loading="followLoading"
+                @click="handleFollow"
+              >
+                {{ isFollowed ? '已关注' : '关注' }}
               </el-button>
             </div>
           </div>
@@ -54,8 +68,8 @@
             <el-descriptions-item label="注册时间" v-if="userInfo.createDate">
               {{ formatDate(userInfo.createDate) }}
             </el-descriptions-item>
-            <el-descriptions-item label="关联作者ID" v-if="userInfo.authorId">
-              {{ userInfo.authorId }}
+            <el-descriptions-item label="关联学者" v-if="userInfo.authorId && userInfo.role === 1">
+              <router-link :to="`/authors/${userInfo.authorId}`">{{ userInfo.authorName || '已关联学者' }}</router-link>
             </el-descriptions-item>
           </el-descriptions>
         </div>
@@ -69,7 +83,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { getUserInfo } from '@/api/privateMessage'
-import { checkFollowStatus, followUser, unfollowUser } from '@/api/follow'
+import { getAuthorById } from '@/api/author'
+import { followUser, unfollowUser, getMyFollows, unfollow } from '@/api/follow'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
 
@@ -80,6 +95,8 @@ const userStore = useUserStore()
 const loading = ref(false)
 const userInfo = ref(null)
 const isFollowed = ref(false)
+const followId = ref(null)
+const followLoading = ref(false)
 
 const userId = computed(() => parseInt(route.params.id))
 const isCurrentUser = computed(() => userStore.user?.uid === userId.value)
@@ -91,8 +108,28 @@ const fetchUserInfo = async () => {
     const res = await getUserInfo(userId.value)
     userInfo.value = res.data
     
-    // 检查关注状态
-    if (!isCurrentUser.value && userInfo.value.authorId) {
+    // 若有关联学者，尝试获取学者姓名（兼容短 id 与 openalex 完整 id）
+    if (userInfo.value?.authorId) {
+      try {
+        let aRes = null
+        try {
+          aRes = await getAuthorById(userInfo.value.authorId)
+        } catch (e) {
+          try {
+            aRes = await getAuthorById(`https://openalex.org/${userInfo.value.authorId}`)
+          } catch (e2) {
+            console.warn('尝试用不同 id 查询学者均失败', e2)
+          }
+        }
+        if (aRes && aRes.data) {
+          userInfo.value.authorName = aRes.data.name || ''
+        }
+      } catch (err) {
+        console.error('获取学者信息失败', err)
+      }
+    }
+    // 检查关注状态（只要不是当前用户就检查）
+    if (!isCurrentUser.value) {
       checkFollow()
     }
   } catch (error) {
@@ -104,11 +141,34 @@ const fetchUserInfo = async () => {
 }
 
 const checkFollow = async () => {
-  if (!userStore.isLoggedIn || !userInfo.value.authorId) return
-  
+  if (!userStore.isLoggedIn) return
+
   try {
-    const res = await checkFollowStatus(userInfo.value.authorId)
-    isFollowed.value = res.data
+    // 获取我的关注列表，查找是否存在对该用户或其关联学者的关注
+    const res = await getMyFollows({ page: 0, size: 100 })
+    // 后端返回格式: { follows: [{ id, authorId, userId, name, avatar, organizationName, type }] }
+    const list = res.data?.follows || res.follows || []
+    followId.value = null
+    isFollowed.value = false
+    
+    // 要匹配的目标 ID
+    const targetAuthorId = userInfo.value?.authorId
+    const targetUserId = userInfo.value?.uid
+    
+    for (const f of list) {
+      // 后端 authorId 字段是被关注者的 authorId
+      if (targetAuthorId && f.authorId && String(f.authorId) === String(targetAuthorId)) {
+        isFollowed.value = true
+        followId.value = f.id
+        break
+      }
+      // 也检查 userId 匹配
+      if (targetUserId && f.userId && String(f.userId) === String(targetUserId)) {
+        isFollowed.value = true
+        followId.value = f.id
+        break
+      }
+    }
   } catch (error) {
     console.error('检查关注状态失败', error)
   }
@@ -120,23 +180,64 @@ const handleFollow = async () => {
     return
   }
 
+  followLoading.value = true
   try {
     if (isFollowed.value) {
-      await unfollowUser(userInfo.value.authorId)
-      isFollowed.value = false
-      ElMessage.success('取消关注成功')
+      // 取消关注
+      let removed = false
+      
+      // 1. 优先使用 followId 取消关注
+      if (followId.value) {
+        try {
+          await unfollow(followId.value)
+          removed = true
+        } catch (e) {
+          console.warn('使用 followId 删除失败', e)
+        }
+      }
+
+      // 2. 使用 authorId 取消关注
+      if (!removed && userInfo.value?.authorId) {
+        try {
+          await unfollowUser(userInfo.value.authorId)
+          removed = true
+        } catch (e) {
+          console.warn('使用 authorId 删除失败', e)
+        }
+      }
+
+      if (removed) {
+        if (userInfo.value) {
+          userInfo.value.fansCount = Math.max((userInfo.value.fansCount || 1) - 1, 0)
+        }
+        isFollowed.value = false
+        followId.value = null
+        ElMessage.success('取消关注成功')
+      } else {
+        ElMessage.error('取消关注失败，请重试')
+      }
     } else {
+      // 关注：使用 idTo 字段（后端要求）
+      const targetId = userInfo.value?.authorId || String(userInfo.value.uid)
       await followUser({
-        authorId: userInfo.value.authorId,
-        authorName: userInfo.value.nickname,
+        idTo: targetId,
+        authorName: userInfo.value.authorName || userInfo.value.nickname || '',
         authorInst: userInfo.value.fields || ''
       })
+
+      if (userInfo.value) {
+        userInfo.value.fansCount = (userInfo.value.fansCount || 0) + 1
+      }
       isFollowed.value = true
+      // 刷新以获取 followId
+      await checkFollow()
       ElMessage.success('关注成功')
     }
   } catch (error) {
     console.error('操作失败', error)
-    ElMessage.error('操作失败，请重试')
+    ElMessage.error(error?.response?.data?.message || '操作失败，请重试')
+  } finally {
+    followLoading.value = false
   }
 }
 
@@ -158,6 +259,13 @@ const formatDate = (date) => {
   return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
 }
 
+// 跳转到学者页面
+const goToAuthorPage = () => {
+  if (userInfo.value?.authorId) {
+    router.push(`/authors/${userInfo.value.authorId}`)
+  }
+}
+
 onMounted(() => {
   fetchUserInfo()
 })
@@ -172,43 +280,56 @@ onMounted(() => {
 
 .profile-container {
   padding: 32px;
+  position: relative;
+}
+
+.top-right-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
 }
 
 .profile-header {
   display: flex;
-  gap: 32px;
-  padding-bottom: 32px;
-  border-bottom: 1px solid var(--border-lighter);
-  margin-bottom: 32px;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+
+  .user-avatar {
+    flex-shrink: 0;
+  }
 
   .profile-info {
     flex: 1;
+    min-width: 0;
 
     .user-nickname {
-      font-size: 28px;
+      font-size: 24px;
       font-weight: 600;
-      color: var(--text-primary);
-      margin: 0 0 12px 0;
+      margin: 0 0 8px 0;
+      color: #303133;
     }
 
     .user-meta {
       display: flex;
-      gap: 24px;
-      margin-bottom: 20px;
-      color: var(--text-secondary);
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 16px;
+      color: #606266;
       font-size: 14px;
 
-      span {
+      .meta-item {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 4px;
       }
     }
 
     .user-stats {
       display: flex;
       gap: 32px;
-      margin-bottom: 24px;
+      margin-bottom: 16px;
 
       .stat-item {
         display: flex;
@@ -218,12 +339,12 @@ onMounted(() => {
         .stat-value {
           font-size: 24px;
           font-weight: 600;
-          color: var(--primary-color);
+          color: var(--el-color-primary, #409eff);
         }
 
         .stat-label {
           font-size: 14px;
-          color: var(--text-secondary);
+          color: #909399;
           margin-top: 4px;
         }
       }
@@ -232,13 +353,17 @@ onMounted(() => {
     .profile-actions {
       display: flex;
       gap: 12px;
+      flex-wrap: wrap;
     }
   }
 }
 
 .profile-details {
+  margin-top: 24px;
+
   :deep(.el-descriptions__label) {
     font-weight: 500;
+    width: 100px;
   }
 }
 </style>

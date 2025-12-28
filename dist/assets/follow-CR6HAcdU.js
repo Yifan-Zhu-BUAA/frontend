@@ -1,1 +1,0 @@
-import{V as s}from"./index-COpeM2_A.js";function l(o){return s.get("/social/users/me/follows",{params:o})}function t(o){return s.get("/social/users/me/fans",{params:o})}function n(o){return s.post("/social/follows",o)}function r(o){return s.delete(`/social/follows/${o}`)}export{t as a,n as f,l as g,r as u};

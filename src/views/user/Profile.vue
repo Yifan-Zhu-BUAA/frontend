@@ -62,10 +62,35 @@ const rules = {
 }
 
 const handleAvatarChange = (file) => {
-  // 这里可以实现头像上传逻辑
+  // 压缩图片后转为 Base64
+  const maxSize = 200 // 最大宽高 200px
   const reader = new FileReader()
   reader.onload = (e) => {
-    form.avatar = e.target.result
+    const img = new Image()
+    img.onload = () => {
+      // 创建 canvas 压缩图片
+      const canvas = document.createElement('canvas')
+      let width = img.width
+      let height = img.height
+      
+      // 等比例缩放
+      if (width > height && width > maxSize) {
+        height = (height * maxSize) / width
+        width = maxSize
+      } else if (height > maxSize) {
+        width = (width * maxSize) / height
+        height = maxSize
+      }
+      
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, width, height)
+      
+      // 转为 Base64，质量 0.8
+      form.avatar = canvas.toDataURL('image/jpeg', 0.8)
+    }
+    img.src = e.target.result
   }
   reader.readAsDataURL(file.raw)
 }

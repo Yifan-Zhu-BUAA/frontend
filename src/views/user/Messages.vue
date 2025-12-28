@@ -38,7 +38,13 @@
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="私信" name="private">
+      <el-tab-pane name="private">
+        <template #label>
+          <span class="tab-label-with-badge">
+            私信
+            <el-badge :is-dot="hasUnreadPrivateMessages" class="private-badge" />
+          </span>
+        </template>
         <div class="private-messages" v-loading="privateLoading">
           <div 
             class="conversation-item"
@@ -68,7 +74,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getMessages, markMessageRead } from '@/api/message'
 import { getConversations } from '@/api/privateMessage'
@@ -85,6 +91,11 @@ const conversations = ref([])
 const total = ref(0)
 const page = ref(1)
 const size = 20
+
+// 计算是否有未读私信
+const hasUnreadPrivateMessages = computed(() => {
+  return conversations.value.some(conv => conv.unreadCount > 0)
+})
 
 const fetchMessages = async () => {
   loading.value = true
@@ -133,7 +144,11 @@ const openChat = (userId) => {
 
 const formatDate = (date) => date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-'
 
-onMounted(() => { fetchMessages() })
+onMounted(() => {
+  fetchMessages()
+  // 同时获取私信列表，用于显示红点
+  fetchConversations()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -247,6 +262,23 @@ onMounted(() => { fetchMessages() })
     display: flex;
     justify-content: center;
     margin-top: 24px;
+  }
+
+  // 私信标签红点样式
+  .tab-label-with-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    
+    .private-badge {
+      position: relative;
+      top: -2px;
+      
+      :deep(.el-badge__content.is-dot) {
+        right: 0;
+        transform: none;
+      }
+    }
   }
 }
 </style>

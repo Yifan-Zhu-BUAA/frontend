@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 
@@ -66,6 +66,11 @@ const route = useRoute()
 const userStore = useUserStore()
 
 const activeMenu = computed(() => route.path)
+
+// 进入个人中心时刷新用户信息，获取最新的关注/粉丝数量
+onMounted(() => {
+  userStore.checkAuth()
+})
 </script>
 
 <style lang="scss" scoped>

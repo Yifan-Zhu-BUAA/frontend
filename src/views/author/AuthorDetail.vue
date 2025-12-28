@@ -33,6 +33,9 @@
             <el-icon><Check /></el-icon>
             已关注
           </el-button>
+          <el-button v-if="author && (author.uid || author.userId)" type="default" @click="goToUserPage" style="margin-left: 12px;">
+            前往用户页
+          </el-button>
         </div>
       </div>
 
@@ -206,6 +209,13 @@
         </el-tab-pane>
       </el-tabs>
     </div>
+
+    <!-- 专家合作关系网络图 -->
+    <AuthorNetwork 
+      v-if="author && coauthors.length > 0"
+      :centerAuthor="author"
+      :coauthors="coauthors"
+    />
   </div>
 </template>
 
@@ -213,6 +223,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import WorkCard from '@/components/cards/WorkCard.vue'
+import AuthorNetwork from '@/components/AuthorNetwork.vue'
 import { 
   getAuthorById, 
   getAuthorWorks, 
@@ -304,7 +315,8 @@ const checkFollow = async () => {
 const fetchCoauthors = async () => {
   tabLoading.value = true
   try {
-    const res = await getAuthorCoauthors(route.params.id, { page: coauthorsPage.value, size: 12 })
+    // 获取更多合著者用于关系网络图（最多20个）
+    const res = await getAuthorCoauthors(route.params.id, { page: coauthorsPage.value, size: 20 })
     coauthors.value = res.data?.list || []
     coauthorsTotal.value = res.data?.total || 0
   } catch (error) {
@@ -457,6 +469,17 @@ watch(activeTab, (tab) => {
 const goToAuthor = (authorId) => {
   if (authorId === route.params.id) return
   router.push(`/authors/${authorId}`)
+}
+
+// 跳转到用户页面（放在 script setup 内，兼容 uid 或 userId）
+const goToUserPage = () => {
+  if (author.value && (author.value.uid || author.value.userId)) {
+    const uid = author.value.uid || author.value.userId
+    router.push(`/user/${uid}`)
+  } else {
+    // 后端未返回关联用户 id 时提示
+    ElMessage.warning('当前学者未绑定用户或用户ID不可用')
+  }
 }
 
 // 监听路由参数变化，重新加载数据

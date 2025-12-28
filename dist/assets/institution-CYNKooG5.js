@@ -1,1 +1,0 @@
-import{V as n}from"./index-COpeM2_A.js";function s(t){return n.get("/achievements/institutions",{params:t})}function o(t){return n.get(`/achievements/institutions/${t}`)}function u(t,i){return n.get(`/achievements/institutions/${t}/authors`,{params:i})}function r(t,i){return n.get(`/achievements/institutions/${t}/works`,{params:i})}export{o as a,u as b,r as c,s as g};
