@@ -22,7 +22,11 @@
         </div>
 
         <el-menu :default-active="activeMenu" router>
-          <el-menu-item index="/user">
+          <el-menu-item index="/user/dashboard">
+            <el-icon><DataBoard /></el-icon>
+            <span>个人门户</span>
+          </el-menu-item>
+          <el-menu-item index="/user/profile">
             <el-icon><User /></el-icon>
             <span>个人资料</span>
           </el-menu-item>
