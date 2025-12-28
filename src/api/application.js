@@ -1,8 +1,13 @@
 import request from '@/utils/request'
 
 // 用户发起学者申请
-export function createApplication(data) {
-  return request.post('/application/applications', data)
+export function createApplication(data, file) {
+  const formData = new FormData()
+  formData.append('data', new Blob([JSON.stringify(data)], { type: 'application/json' }))
+  if (file) {
+    formData.append('file', file)
+  }
+  return request.post('/application/applications', formData)
 }
 
 // 我的申请记录

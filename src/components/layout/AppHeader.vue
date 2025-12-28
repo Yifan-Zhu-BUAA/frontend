@@ -1,40 +1,18 @@
 <template>
   <header class="app-header">
     <div class="header-container">
-      <!-- Logo -->
-      <div class="logo" @click="router.push('/')">
-        <el-icon :size="28" color="#4A90E2"><Reading /></el-icon>
-        <span class="logo-text">学术成果分享平台</span>
-      </div>      <!-- 搜索框 -->
-      <div class="search-box">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索学者、著作、机构、概念..."
-          size="large"
-          clearable
-          @keyup.enter="handleSearch"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-          <template #append>
-            <el-button type="primary" @click="handleSearch">
-              搜索
-            </el-button>
-          </template>
-        </el-input>
-        <el-tooltip content="高级搜索" placement="bottom">
-          <el-button 
-            class="advanced-search-btn" 
-            @click="router.push('/works/advanced-search')"
-            :icon="Filter"
-            circle
-          />
-        </el-tooltip>
+      <!-- 左侧区域：Logo -->
+      <div class="left-section">
+        <div class="logo" @click="router.push('/')">
+          <el-icon :size="28" color="#4A90E2"><Reading /></el-icon>
+          <span class="logo-text">学术成果分享平台</span>
+        </div>
       </div>
 
-      <!-- 导航菜单 -->
-      <nav class="nav-menu">
+      <!-- 右侧区域：导航菜单和用户区域 -->
+      <div class="right-section">
+        <!-- 导航菜单 -->
+        <nav class="nav-menu">
         <el-menu mode="horizontal" :ellipsis="false" :default-active="activeMenu">
           <el-menu-item index="authors" @click="router.push('/authors')">
             <el-icon><User /></el-icon>
@@ -110,6 +88,7 @@
           <el-button @click="router.push('/register')">注册</el-button>
         </template>
       </div>
+      </div>
     </div>
   </header>
 </template>
@@ -117,7 +96,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Filter } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useMessageStore } from '@/stores/message'
 
@@ -125,8 +103,6 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const messageStore = useMessageStore()
-
-const searchKeyword = ref('')
 
 // 使用 store 中的未读数量
 const unreadCount = computed(() => messageStore.unreadCount)
@@ -139,15 +115,6 @@ const activeMenu = computed(() => {
   if (path.includes('/concepts')) return 'concepts'
   return ''
 })
-
-const handleSearch = () => {
-  if (searchKeyword.value.trim()) {
-    router.push({
-      path: '/search',
-      query: { keyword: searchKeyword.value.trim() }
-    })
-  }
-}
 
 const handleCommand = (command) => {
   switch (command) {
@@ -198,6 +165,18 @@ onMounted(() => {
   padding: 0 24px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+}
+
+.left-section {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.right-section {
+  display: flex;
+  align-items: center;
   gap: 24px;
 }
 
@@ -215,27 +194,6 @@ onMounted(() => {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-  }
-}
-
-.search-box {
-  flex: 1;
-  max-width: 480px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-
-  :deep(.el-input-group__append) {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-    
-    .el-button {
-      color: #fff;
-    }
-  }
-
-  .advanced-search-btn {
-    flex-shrink: 0;
   }
 }
 

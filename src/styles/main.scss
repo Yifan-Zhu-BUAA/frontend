@@ -207,3 +207,86 @@ a {
   transform: translateX(20px);
   opacity: 0;
 }
+
+// 搜索建议下拉框样式
+.search-suggestions-popper {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+  border: 1px solid var(--border-lighter) !important;
+  padding: 8px 0 !important;
+  // 限制下拉框最大宽度与搜索框一致
+  max-width: 600px !important;
+  width: 600px !important;
+
+  .el-autocomplete-suggestion__list {
+    padding: 0;
+    margin: 0;
+  }
+
+  li {
+    padding: 0 !important;
+    line-height: normal !important;
+  }
+
+  .suggestion-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+    max-width: 100%;
+    overflow: hidden;
+
+    &:hover {
+      background-color: var(--primary-lightest);
+    }
+
+    .suggestion-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      flex-shrink: 0;
+
+      .el-icon {
+        font-size: 18px;
+        color: #fff;
+      }
+    }
+
+    .suggestion-content {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      max-width: calc(100% - 48px);
+
+      .suggestion-name {
+        font-size: 14px;
+        color: var(--text-primary);
+        font-weight: 500;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+        display: block;
+      }
+
+      .suggestion-type {
+        font-size: 12px;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+  }
+
+  .el-autocomplete-suggestion__wrap {
+    max-height: 400px;
+    padding: 0;
+  }
+}

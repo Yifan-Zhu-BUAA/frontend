@@ -105,6 +105,29 @@
         <div v-if="!selectedAuthor" class="empty-tip">
           <el-empty description="请搜索并选择您要认证的学者" :image-size="80" />
         </div>
+
+        <!-- 证明材料上传 -->
+        <el-form-item label="证明材料">
+          <el-upload
+            class="upload-demo"
+            action="#"
+            :auto-upload="false"
+            :limit="1"
+            :on-change="handleFileChange"
+            :on-remove="handleFileRemove"
+            :file-list="fileList"
+            accept=".jpg,.jpeg,.png,.pdf"
+          >
+            <template #trigger>
+              <el-button type="primary">选择文件</el-button>
+            </template>
+            <template #tip>
+              <div class="el-upload__tip">
+                只能上传 jpg/png/pdf 文件，且不超过 5MB
+              </div>
+            </template>
+          </el-upload>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showApplyDialog = false">取消</el-button>
@@ -144,6 +167,17 @@ const applyForm = reactive({
   field: ''
 })
 
+const fileList = ref([])
+const uploadFile = ref(null)
+
+const handleFileChange = (file) => {
+  uploadFile.value = file.raw
+}
+
+const handleFileRemove = () => {
+  uploadFile.value = null
+}
+
 // 打开申请对话框
 const openApplyDialog = () => {
   resetApplyForm()
@@ -155,6 +189,8 @@ const resetApplyForm = () => {
   selectedAuthor.value = null
   authorOptions.value = []
   Object.keys(applyForm).forEach(k => applyForm[k] = '')
+  fileList.value = []
+  uploadFile.value = null
 }
 
 // 解析研究领域（处理 JSON 数组字符串）
@@ -283,7 +319,7 @@ const submitApplication = async () => {
 
   submitting.value = true
   try {
-    await createApplication(applyForm)
+    await createApplication(applyForm, uploadFile.value)
     ElMessage.success('申请提交成功，请等待管理员审核')
     showApplyDialog.value = false
     resetApplyForm()
