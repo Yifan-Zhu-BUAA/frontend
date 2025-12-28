@@ -5,23 +5,120 @@
       <div class="hero-content">
         <h1 class="hero-title">探索学术世界</h1>
         <p class="hero-subtitle">发现优秀学者、前沿研究与学术成果</p>
+        
+        <!-- 增强搜索框 -->
         <div class="hero-search">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索学者、著作、机构、研究概念..."
-            size="large"
-            @keyup.enter="handleSearch"
-          >
-            <template #prefix>
+          <div class="search-wrapper">
+            <!-- 搜索类型选择 -->
+            <el-select v-model="searchType" class="search-type-select" size="large">
+              <el-option label="全部" value="all" />
+              <el-option label="学者" value="author" />
+              <el-option label="著作" value="work" />
+              <el-option label="机构" value="institution" />
+              <el-option label="概念" value="concept" />
+            </el-select>
+            
+            <!-- 搜索输入框带自动补全 -->
+            <el-autocomplete
+              v-model="searchKeyword"
+              :fetch-suggestions="fetchSuggestions"
+              :trigger-on-focus="false"
+              :debounce="300"
+              placeholder="搜索学者、著作、机构、研究概念..."
+              size="large"
+              class="search-input"
+              popper-class="search-suggestions-popper"
+              @select="handleSuggestionSelect"
+              @keyup.enter="handleSearch"
+              clearable
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+              <template #default="{ item }">
+                <div class="suggestion-item">
+                  <el-icon class="suggestion-icon" :style="{ color: getSuggestionColor(item.type) }">
+                    <component :is="getSuggestionIcon(item.type)" />
+                  </el-icon>
+                  <div class="suggestion-content">
+                    <span class="suggestion-name">{{ item.name }}</span>
+                    <span class="suggestion-type">{{ getSuggestionTypeName(item.type) }}</span>
+                  </div>
+                </div>
+              </template>
+            </el-autocomplete>
+            
+            <el-button type="primary" size="large" class="search-btn" @click="handleSearch">
               <el-icon><Search /></el-icon>
-            </template>
-            <template #append>
-              <el-button type="primary" size="large" @click="handleSearch">
-                搜索
-              </el-button>
-            </template>
-          </el-input>
+              搜索
+            </el-button>
+          </div>
+          
+          <!-- 高级筛选 -->
+          <div class="advanced-filter">
+            <el-button 
+              type="primary" 
+              link 
+              @click="showAdvancedFilter = !showAdvancedFilter"
+              class="toggle-filter-btn"
+            >
+              <el-icon><Filter /></el-icon>
+              高级筛选
+              <el-icon class="arrow-icon" :class="{ 'is-expanded': showAdvancedFilter }">
+                <ArrowDown />
+              </el-icon>
+            </el-button>
+          </div>
+          
+          <!-- 高级筛选面板 -->
+          <el-collapse-transition>
+            <div v-show="showAdvancedFilter" class="filter-panel">
+              <div class="filter-row">
+                <div class="filter-item">
+                  <label>时间范围</label>
+                  <el-date-picker
+                    v-model="filterOptions.dateRange"
+                    type="yearrange"
+                    range-separator="至"
+                    start-placeholder="开始年份"
+                    end-placeholder="结束年份"
+                    size="default"
+                  />
+                </div>
+                <div class="filter-item">
+                  <label>研究领域</label>
+                  <el-select 
+                    v-model="filterOptions.field" 
+                    placeholder="选择领域" 
+                    clearable
+                    size="default"
+                  >
+                    <el-option label="计算机科学" value="Computer Science" />
+                    <el-option label="人工智能" value="Artificial Intelligence" />
+                    <el-option label="机器学习" value="Machine Learning" />
+                    <el-option label="数据挖掘" value="Data Mining" />
+                    <el-option label="自然语言处理" value="Natural Language Processing" />
+                    <el-option label="计算机视觉" value="Computer Vision" />
+                  </el-select>
+                </div>
+                <div class="filter-item">
+                  <label>排序方式</label>
+                  <el-select v-model="filterOptions.sort" size="default">
+                    <el-option label="相关性" value="relevance" />
+                    <el-option label="引用量" value="cited" />
+                    <el-option label="发表时间" value="date" />
+                    <el-option label="H指数" value="hIndex" />
+                  </el-select>
+                </div>
+              </div>
+              <div class="filter-actions">
+                <el-button size="small" @click="resetFilters">重置</el-button>
+                <el-button type="primary" size="small" @click="handleSearch">应用筛选</el-button>
+              </div>
+            </div>
+          </el-collapse-transition>
         </div>
+        
         <div class="hot-keywords">
           <span class="label">热门搜索：</span>
           <el-tag 
@@ -170,18 +267,29 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import AuthorCard from '@/components/cards/AuthorCard.vue'
 import WorkCard from '@/components/cards/WorkCard.vue'
 import { getAuthors, getRecommendedAuthorsForUser } from '@/api/author'
 import { getWorks, getRecommendedWorksForUser } from '@/api/work'
+import { getInstitutions } from '@/api/institution'
+import { getConcepts } from '@/api/concept'
+import { Filter, ArrowDown } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 
 const searchKeyword = ref('')
+const searchType = ref('all')
+const showAdvancedFilter = ref(false)
+const filterOptions = reactive({
+  dateRange: null,
+  field: '',
+  sort: 'relevance'
+})
+
 const hotKeywords = ['人工智能', '机器学习', '深度学习', '计算机视觉', '自然语言处理']
 
 const stats = [
@@ -231,11 +339,163 @@ const loadingWorks = ref(false)
 const loadingRecommendWorks = ref(false)
 const loadingRecommendAuthors = ref(false)
 
+// 搜索建议相关方法
+const fetchSuggestions = async (queryString, cb) => {
+  if (!queryString || queryString.length < 2) {
+    cb([])
+    return
+  }
+  
+  try {
+    const suggestions = []
+    const searchTypes = searchType.value === 'all' 
+      ? ['author', 'work', 'institution', 'concept'] 
+      : [searchType.value]
+    
+    const requests = []
+    
+    if (searchTypes.includes('author')) {
+      requests.push(
+        getAuthors({ keyword: queryString, page: 1, size: 3 })
+          .then(res => {
+            const authors = res.data?.list || []
+            return authors.map(a => ({ 
+              id: a.id, 
+              name: a.name, 
+              type: 'author',
+              data: a
+            }))
+          })
+          .catch(() => [])
+      )
+    }
+    
+    if (searchTypes.includes('work')) {
+      requests.push(
+        getWorks({ keyword: queryString, page: 1, size: 3 })
+          .then(res => {
+            const works = res.data?.list || []
+            return works.map(w => ({ 
+              id: w.workId, 
+              name: w.title, 
+              type: 'work',
+              data: w
+            }))
+          })
+          .catch(() => [])
+      )
+    }
+    
+    if (searchTypes.includes('institution')) {
+      requests.push(
+        getInstitutions({ keyword: queryString, page: 1, size: 3 })
+          .then(res => {
+            const institutions = res.data?.list || []
+            return institutions.map(i => ({ 
+              id: i.id, 
+              name: i.name, 
+              type: 'institution',
+              data: i
+            }))
+          })
+          .catch(() => [])
+      )
+    }
+    
+    if (searchTypes.includes('concept')) {
+      requests.push(
+        getConcepts({ keyword: queryString, page: 1, size: 3 })
+          .then(res => {
+            const concepts = res.data?.list || []
+            return concepts.map(c => ({ 
+              id: c.id, 
+              name: c.name, 
+              type: 'concept',
+              data: c
+            }))
+          })
+          .catch(() => [])
+      )
+    }
+    
+    const results = await Promise.all(requests)
+    results.forEach(arr => suggestions.push(...arr))
+    
+    cb(suggestions.slice(0, 8))
+  } catch (error) {
+    console.error('获取搜索建议失败', error)
+    cb([])
+  }
+}
+
+const getSuggestionIcon = (type) => {
+  const icons = {
+    author: 'User',
+    work: 'Document',
+    institution: 'OfficeBuilding',
+    concept: 'Connection'
+  }
+  return icons[type] || 'Search'
+}
+
+const getSuggestionColor = (type) => {
+  const colors = {
+    author: '#4A90E2',
+    work: '#67C23A',
+    institution: '#E6A23C',
+    concept: '#F56C6C'
+  }
+  return colors[type] || '#909399'
+}
+
+const getSuggestionTypeName = (type) => {
+  const names = {
+    author: '学者',
+    work: '著作',
+    institution: '机构',
+    concept: '概念'
+  }
+  return names[type] || ''
+}
+
+const handleSuggestionSelect = (item) => {
+  const routes = {
+    author: `/authors/${item.id}`,
+    work: `/works/${item.id}`,
+    institution: `/institutions/${item.id}`,
+    concept: `/concepts/${item.id}`
+  }
+  router.push(routes[item.type] || '/search')
+}
+
+const resetFilters = () => {
+  filterOptions.dateRange = null
+  filterOptions.field = ''
+  filterOptions.sort = 'relevance'
+}
+
 const handleSearch = () => {
   if (searchKeyword.value.trim()) {
+    const query = { 
+      keyword: searchKeyword.value.trim(),
+      type: searchType.value
+    }
+    
+    // 添加高级筛选参数
+    if (filterOptions.dateRange && filterOptions.dateRange.length === 2) {
+      query.startYear = filterOptions.dateRange[0].getFullYear()
+      query.endYear = filterOptions.dateRange[1].getFullYear()
+    }
+    if (filterOptions.field) {
+      query.field = filterOptions.field
+    }
+    if (filterOptions.sort !== 'relevance') {
+      query.sort = filterOptions.sort
+    }
+    
     router.push({
       path: '/search',
-      query: { keyword: searchKeyword.value.trim() }
+      query
     })
   }
 }
@@ -355,20 +615,96 @@ onMounted(() => {
   }
 
   .hero-search {
-    max-width: 600px;
+    max-width: 700px;
     margin: 0 auto 24px;
 
-    :deep(.el-input-group__append) {
-      background-color: var(--primary-color);
-      border-color: var(--primary-color);
+    .search-wrapper {
+      display: flex;
+      align-items: center;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
       
-      .el-button {
-        color: #fff;
+      .search-type-select {
+        width: 100px;
+        flex-shrink: 0;
+        
+        :deep(.el-input__wrapper) {
+          box-shadow: none;
+          border-radius: 0;
+          border-right: 1px solid var(--border-lighter);
+        }
+      }
+      
+      .search-input {
+        flex: 1;
+        
+        :deep(.el-input__wrapper) {
+          box-shadow: none;
+          border-radius: 0;
+        }
+      }
+      
+      .search-btn {
+        flex-shrink: 0;
+        border-radius: 0;
+        height: 40px;
+        padding: 0 24px;
       }
     }
-
-    :deep(.el-input__wrapper) {
-      box-shadow: var(--shadow-md);
+    
+    .advanced-filter {
+      margin-top: 12px;
+      text-align: center;
+      
+      .toggle-filter-btn {
+        font-size: 14px;
+        
+        .arrow-icon {
+          margin-left: 4px;
+          transition: transform 0.3s;
+          
+          &.is-expanded {
+            transform: rotate(180deg);
+          }
+        }
+      }
+    }
+    
+    .filter-panel {
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 12px;
+      box-shadow: var(--shadow-sm);
+      
+      .filter-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 16px;
+        
+        .filter-item {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          min-width: 180px;
+          
+          label {
+            font-size: 13px;
+            color: var(--text-secondary);
+          }
+        }
+      }
+      
+      .filter-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border-lighter);
+      }
     }
   }
 

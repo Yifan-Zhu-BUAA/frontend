@@ -16,9 +16,6 @@ const ERROR_CODE_MAP = {
 const request = axios.create({
   baseURL: '/api',
   timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 })
 
 // 请求拦截器

@@ -14,6 +14,16 @@
       <el-table-column prop="authorName" label="学者姓名" />
       <el-table-column prop="institutionName" label="机构" />
       <el-table-column prop="field" label="研究领域" />
+      <el-table-column prop="proof" label="证明材料" width="120">
+        <template #default="{ row }">
+          <template v-if="row.proof">
+            <el-button type="primary" size="small" link @click="viewProof(row.proof)">
+              查看材料
+            </el-button>
+          </template>
+          <span v-else class="no-proof">未上传</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="applicationTime" label="申请时间" width="160">
         <template #default="{ row }">{{ formatDate(row.applicationTime) }}</template>
       </el-table-column>
@@ -43,6 +53,17 @@
         @current-change="fetchData"
       />
     </div>
+
+    <!-- 证明材料预览弹窗 -->
+    <el-dialog v-model="proofDialogVisible" title="证明材料预览" width="700px">
+      <div class="proof-preview">
+        <img v-if="isImage(currentProof)" :src="getProofUrl(currentProof)" alt="证明材料" class="proof-image" />
+        <iframe v-else-if="isPdf(currentProof)" :src="getProofUrl(currentProof)" class="proof-pdf"></iframe>
+        <div v-else class="proof-link">
+          <el-button type="primary" @click="downloadProof">下载查看</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -58,6 +79,37 @@ const total = ref(0)
 const page = ref(1)
 const size = 20
 const filterStatus = ref(null)
+
+const proofDialogVisible = ref(false)
+const currentProof = ref('')
+
+const viewProof = (proof) => {
+  currentProof.value = proof
+  proofDialogVisible.value = true
+}
+
+const getProofUrl = (proof) => {
+  // 如果是相对路径，拼接后端地址
+  if (proof.startsWith('/')) {
+    return `http://localhost:8090${proof}`
+  }
+  return proof
+}
+
+const isImage = (proof) => {
+  if (!proof) return false
+  const ext = proof.toLowerCase()
+  return ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.png') || ext.endsWith('.gif')
+}
+
+const isPdf = (proof) => {
+  if (!proof) return false
+  return proof.toLowerCase().endsWith('.pdf')
+}
+
+const downloadProof = () => {
+  window.open(getProofUrl(currentProof.value), '_blank')
+}
 
 const fetchData = async () => {
   loading.value = true
@@ -132,10 +184,38 @@ onMounted(() => { fetchData() })
     font-size: 13px;
   }
 
+  .no-proof {
+    color: var(--text-placeholder);
+    font-size: 12px;
+  }
+
   .pagination-wrapper {
     display: flex;
     justify-content: center;
     margin-top: 24px;
+  }
+}
+
+.proof-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+
+  .proof-image {
+    max-width: 100%;
+    max-height: 500px;
+    object-fit: contain;
+  }
+
+  .proof-pdf {
+    width: 100%;
+    height: 500px;
+    border: none;
+  }
+
+  .proof-link {
+    text-align: center;
   }
 }
 </style>
