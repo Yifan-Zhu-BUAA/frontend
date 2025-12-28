@@ -27,7 +27,50 @@
       </el-form-item>
 
       <el-form-item label="研究领域" prop="fields">
-        <el-input v-model="form.fields" type="textarea" :rows="3" placeholder="多个领域用分号分隔" />
+        <div class="fields-tags">
+          <el-tag
+            v-for="(field, index) in fieldsList"
+            :key="index"
+            closable
+            @close="handleRemoveField(index)"
+            class="field-tag"
+          >
+            {{ field }}
+          </el-tag>
+          <el-popover
+            v-if="inputVisible"
+            :visible="showSuggestions && suggestions.length > 0"
+            placement="bottom-start"
+            :width="200"
+            :show-arrow="false"
+          >
+            <template #reference>
+              <el-input
+                ref="inputRef"
+                v-model="inputValue"
+                class="field-input"
+                size="small"
+                @input="handleSearchFields"
+                @keyup.enter="handleInputConfirm"
+                @blur="handleInputBlur"
+                placeholder="输入搜索或创建"
+              />
+            </template>
+            <div class="suggestions-list">
+              <div
+                v-for="item in suggestions"
+                :key="item.conceptId"
+                class="suggestion-item"
+                @mousedown.prevent="selectSuggestion(item)"
+              >
+                {{ item.name }}
+              </div>
+            </div>
+          </el-popover>
+          <el-button v-if="!inputVisible" class="add-field-btn" size="small" @click="showInput">
+            <el-icon><Plus /></el-icon> 添加领域
+          </el-button>
+        </div>
       </el-form-item>
 
       <el-form-item>
@@ -38,10 +81,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { updateProfile } from '@/api/auth'
+import { getConcepts } from '@/api/concept'
 import { ElMessage } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const formRef = ref(null)
@@ -53,6 +98,114 @@ const form = reactive({
   avatar: '',
   fields: ''
 })
+
+// 研究领域标签相关
+const inputVisible = ref(false)
+const inputValue = ref('')
+const inputRef = ref(null)
+const suggestions = ref([])
+const showSuggestions = ref(false)
+let searchTimeout = null
+
+// 将 fields 字符串转换为数组
+const fieldsList = computed(() => {
+  if (!form.fields) return []
+  return form.fields.split(/[;；]/).map(s => s.trim()).filter(Boolean)
+})
+
+// 显示输入框
+const showInput = () => {
+  inputVisible.value = true
+  suggestions.value = []
+  nextTick(() => {
+    inputRef.value?.focus()
+  })
+}
+
+// 搜索研究领域
+const handleSearchFields = () => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  
+  if (!inputValue.value.trim()) {
+    suggestions.value = []
+    showSuggestions.value = false
+    return
+  }
+  
+  searchTimeout = setTimeout(async () => {
+    try {
+      const res = await getConcepts({ keyword: inputValue.value, page: 1, size: 30 })
+      const data = res.data?.data || res.data
+      let items = data?.list || data?.items || []
+      
+      // 按相关性排序
+      const query = inputValue.value.toLowerCase()
+      items = items.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase()
+        const nameB = (b.name || '').toLowerCase()
+        
+        if (nameA === query && nameB !== query) return -1
+        if (nameB === query && nameA !== query) return 1
+        
+        const aStarts = nameA.startsWith(query)
+        const bStarts = nameB.startsWith(query)
+        if (aStarts && !bStarts) return -1
+        if (bStarts && !aStarts) return 1
+        
+        return nameA.indexOf(query) - nameB.indexOf(query)
+      })
+      
+      suggestions.value = items.slice(0, 10)
+      showSuggestions.value = suggestions.value.length > 0
+    } catch (e) {
+      suggestions.value = []
+      showSuggestions.value = false
+    }
+  }, 300)
+}
+
+// 选择建议
+const selectSuggestion = (item) => {
+  const newFields = [...fieldsList.value, item.name]
+  form.fields = newFields.join(';')
+  inputVisible.value = false
+  inputValue.value = ''
+  suggestions.value = []
+  showSuggestions.value = false
+}
+
+// 输入框失焦
+const handleInputBlur = () => {
+  setTimeout(() => {
+    if (inputValue.value.trim()) {
+      const newFields = [...fieldsList.value, inputValue.value.trim()]
+      form.fields = newFields.join(';')
+    }
+    inputVisible.value = false
+    inputValue.value = ''
+    suggestions.value = []
+    showSuggestions.value = false
+  }, 150)
+}
+
+// 确认输入
+const handleInputConfirm = () => {
+  if (inputValue.value.trim()) {
+    const newFields = [...fieldsList.value, inputValue.value.trim()]
+    form.fields = newFields.join(';')
+  }
+  inputVisible.value = false
+  inputValue.value = ''
+  suggestions.value = []
+  showSuggestions.value = false
+}
+
+// 删除标签
+const handleRemoveField = (index) => {
+  const newFields = [...fieldsList.value]
+  newFields.splice(index, 1)
+  form.fields = newFields.join(';')
+}
 
 const rules = {
   nickname: [
@@ -150,6 +303,42 @@ onMounted(() => {
       font-size: 12px;
       color: var(--text-secondary);
       margin-top: 8px;
+    }
+  }
+  
+  .fields-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    
+    .field-tag {
+      margin: 0;
+    }
+    
+    .field-input {
+      width: 150px;
+    }
+    
+    .add-field-btn {
+      border-style: dashed;
+    }
+  }
+}
+
+.suggestions-list {
+  max-height: 200px;
+  overflow-y: auto;
+  
+  .suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 13px;
+    
+    &:hover {
+      background: var(--primary-lighter);
+      color: var(--primary-color);
     }
   }
 }

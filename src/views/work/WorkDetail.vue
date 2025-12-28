@@ -99,6 +99,18 @@
         </div>
       </div>
 
+      <!-- 引用格式 -->
+      <div class="work-citation">
+        <h3>引用本文</h3>
+        <div class="citation-box" @click="copyCitation">
+          <p class="citation-text">{{ citationText }}</p>
+          <div class="copy-hint">
+            <el-icon><DocumentCopy /></el-icon>
+            <span>点击复制</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 机构 -->
       <div class="work-institutions" v-if="work.institutions?.length">
         <h3>相关机构</h3>
@@ -320,7 +332,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { getWorkById, getWorkReferences, getWorkCitedBy, getRecommendedWorks } from '@/api/work'
@@ -696,6 +708,85 @@ const formatDate = (date) => {
   return dayjs(date).format('YYYY-MM-DD')
 }
 
+// 生成引用格式（APA风格）
+const citationText = computed(() => {
+  if (!work.value) return ''
+  
+  // 获取作者
+  let authors = ''
+  if (work.value.authors?.length) {
+    const authorNames = work.value.authors.map(a => a.name)
+    if (authorNames.length === 1) {
+      authors = authorNames[0]
+    } else if (authorNames.length === 2) {
+      authors = authorNames.join(' & ')
+    } else if (authorNames.length > 2) {
+      authors = authorNames.slice(0, -1).join(', ') + ', & ' + authorNames[authorNames.length - 1]
+    }
+  } else if (work.value.authorNames) {
+    authors = work.value.authorNames
+  } else {
+    authors = 'Unknown'
+  }
+  
+  // 获取年份
+  const year = work.value.publishTime ? dayjs(work.value.publishTime).year() : 'n.d.'
+  
+  // 获取标题
+  const title = work.value.title || 'Untitled'
+  
+  // 获取期刊
+  const journal = work.value.journal || ''
+  
+  // 获取卷期页
+  let volumeInfo = ''
+  if (work.value.volume) {
+    volumeInfo += work.value.volume
+  }
+  if (work.value.issue) {
+    volumeInfo += `(${work.value.issue})`
+  }
+  if (work.value.pages) {
+    volumeInfo += volumeInfo ? `, ${work.value.pages}` : work.value.pages
+  }
+  
+  // 获取DOI
+  const doi = work.value.doi ? `https://doi.org/${work.value.doi.replace(/^https?:\/\/doi\.org\//, '')}` : ''
+  
+  // 组装引用格式 (APA 7th)
+  let citation = `${authors} (${year}). ${title}.`
+  if (journal) {
+    citation += ` ${journal}`
+    if (volumeInfo) {
+      citation += `, ${volumeInfo}`
+    }
+    citation += '.'
+  }
+  if (doi) {
+    citation += ` ${doi}`
+  }
+  
+  return citation
+})
+
+// 复制引用
+const copyCitation = () => {
+  if (!citationText.value) return
+  
+  navigator.clipboard.writeText(citationText.value).then(() => {
+    ElMessage.success('引用已复制到剪贴板')
+  }).catch(() => {
+    // 备用方法
+    const textarea = document.createElement('textarea')
+    textarea.value = citationText.value
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    ElMessage.success('引用已复制到剪贴板')
+  })
+}
+
 const parseKeywords = (keywords) => {
   if (!keywords) return []
   if (typeof keywords === 'string') {
@@ -829,7 +920,8 @@ onMounted(() => {
   .work-abstract,
   .work-keywords,
   .work-concepts,
-  .work-institutions {
+  .work-institutions,
+  .work-citation {
     margin-bottom: 20px;
 
     h3 {
@@ -843,6 +935,53 @@ onMounted(() => {
       font-size: 14px;
       color: var(--text-regular);
       line-height: 1.8;
+    }
+  }
+  
+  .work-citation {
+    .citation-box {
+      position: relative;
+      padding: 16px;
+      padding-right: 100px;
+      background: var(--bg-light);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all 0.3s;
+      
+      &:hover {
+        background: var(--primary-lightest);
+        border-color: var(--primary-lighter);
+        
+        .copy-hint {
+          color: var(--primary-color);
+        }
+      }
+      
+      .citation-text {
+        font-size: 13px;
+        color: var(--text-regular);
+        line-height: 1.6;
+        word-break: break-all;
+        margin: 0;
+      }
+      
+      .copy-hint {
+        position: absolute;
+        right: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        transition: color 0.3s;
+        
+        .el-icon {
+          font-size: 16px;
+        }
+      }
     }
   }
 

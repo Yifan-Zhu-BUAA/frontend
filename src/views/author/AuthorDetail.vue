@@ -419,7 +419,22 @@ const formatFields = (fields) => {
 
 const parseFields = (fields) => {
   if (!fields) return []
-  if (typeof fields === 'string') return fields.split(/[;；,，]/).map(s => s.trim()).filter(Boolean)
+  if (typeof fields === 'string') {
+    // 尝试解析 JSON 数组格式，如 ["a", "b", "c"]
+    const trimmed = fields.trim()
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) {
+          return parsed.map(f => typeof f === 'string' ? f : (f.name || f)).filter(Boolean)
+        }
+      } catch (e) {
+        // JSON 解析失败，使用普通分割
+      }
+    }
+    // 普通字符串分割
+    return fields.split(/[;；,，]/).map(s => s.trim()).filter(Boolean)
+  }
   if (Array.isArray(fields)) return fields.map(f => f.name || f)
   return []
 }

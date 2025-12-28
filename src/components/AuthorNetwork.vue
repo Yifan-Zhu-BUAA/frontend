@@ -134,13 +134,22 @@ const getDisplayName = (name, isCenter) => {
   return name.length > 4 ? name.slice(0, 4) : name
 }
 
-// 计算节点位置 - 不规则放射状布局
+// 检测两个节点是否重叠
+const isOverlapping = (node1, node2, padding = 10) => {
+  const dx = node1.x - node2.x
+  const dy = node1.y - node2.y
+  const distance = Math.sqrt(dx * dx + dy * dy)
+  const minDistance = node1.radius + node2.radius + padding
+  return distance < minDistance
+}
+
+// 计算节点位置 - 错落有致的放射状布局
 const calculateLayout = () => {
   if (!networkContainer.value) return
   
   const container = networkContainer.value
   const width = container.clientWidth
-  const height = 500
+  const height = 600
   const centerX = width / 2
   const centerY = height / 2
   
@@ -170,38 +179,114 @@ const calculateLayout = () => {
     isCenter: true
   }
   
-  // 创建合作者节点 - 不规则放射状布局
-  const coauthorNodes = displayCoauthors.map((coauthor, index) => {
-    const total = displayCoauthors.length
-    
-    // 基础角度，添加随机偏移让布局更自然
-    const baseAngle = (2 * Math.PI * index) / total - Math.PI / 2
-    const angleOffset = (Math.random() - 0.5) * 0.3 // 随机角度偏移
-    const angle = baseAngle + angleOffset
-    
+  // 预设的距离层级，制造错落感（调整为更小的比例确保不超出边界）
+  const distanceLevels = [
+    { min: 0.18, max: 0.22 },  // 近层
+    { min: 0.26, max: 0.30 },  // 中层
+    { min: 0.34, max: 0.38 },  // 远层
+  ]
+  
+  // 根据节点数量分配到不同层级
+  const total = displayCoauthors.length
+  const coauthorNodes = []
+  
+  displayCoauthors.forEach((coauthor, index) => {
     // 根据合作次数计算节点大小 (25-45)
     const normalizedCount = (coauthor.count || 1 - minCount) / (maxCount - minCount || 1)
     const nodeRadius = 25 + normalizedCount * 20
     
-    // 根据合作次数计算距离 - 合作次数多的离中心更近
-    const baseDistance = Math.min(width, height) * 0.32
-    const distanceVariation = (1 - normalizedCount) * 50 + Math.random() * 30
-    const distance = baseDistance + distanceVariation
+    // 基础角度，略微偏移使布局更自然
+    const baseAngle = (2 * Math.PI * index) / total - Math.PI / 2
+    const angleJitter = (index % 2 === 0 ? 1 : -1) * 0.08
+    const angle = baseAngle + angleJitter
     
-    return {
-      id: coauthor.coauthorId || coauthor.id,
-      name: coauthor.name,
-      organization: coauthor.organizationName,
-      count: coauthor.count,
-      worksCount: coauthor.worksCount,
-      hIndex: coauthor.hIndex,
-      x: centerX + distance * Math.cos(angle),
-      y: centerY + distance * Math.sin(angle),
-      radius: nodeRadius,
-      isCenter: false
+    // 交替分配到不同距离层级，制造错落效果
+    // 使用模式: 近-远-中-近-远-中... 或根据索引变化
+    let levelIndex
+    if (total <= 6) {
+      // 少量节点时，交替近远
+      levelIndex = index % 2 === 0 ? 0 : 2
+    } else {
+      // 多节点时，三层交替
+      const pattern = [0, 2, 1, 2, 0, 1] // 近-远-中-远-近-中
+      levelIndex = pattern[index % pattern.length]
+    }
+    
+    const level = distanceLevels[levelIndex]
+    // 在层级范围内添加随机变化
+    const levelVariation = Math.random() * (level.max - level.min)
+    const baseDistance = Math.min(width, height) * (level.min + levelVariation)
+    
+    // 尝试找到不重叠的位置
+    let placed = false
+    let distance = baseDistance
+    let currentAngle = angle
+    let attempts = 0
+    const maxAttempts = 15
+    
+    while (!placed && attempts < maxAttempts) {
+      const testNode = {
+        x: centerX + distance * Math.cos(currentAngle),
+        y: centerY + distance * Math.sin(currentAngle),
+        radius: nodeRadius
+      }
+      
+      // 检查与中心节点的重叠
+      let hasOverlap = isOverlapping(testNode, centerNode, 12)
+      
+      // 检查与已放置节点的重叠
+      if (!hasOverlap) {
+        for (const existingNode of coauthorNodes) {
+          if (isOverlapping(testNode, existingNode, 6)) {
+            hasOverlap = true
+            break
+          }
+        }
+      }
+      
+      if (!hasOverlap) {
+        coauthorNodes.push({
+          id: coauthor.coauthorId || coauthor.id,
+          name: coauthor.name,
+          organization: coauthor.organizationName,
+          count: coauthor.count,
+          worksCount: coauthor.worksCount,
+          hIndex: coauthor.hIndex,
+          x: testNode.x,
+          y: testNode.y,
+          radius: nodeRadius,
+          isCenter: false
+        })
+        placed = true
+      } else {
+        // 调整策略：先微调角度，再增加距离
+        if (attempts < 5) {
+          currentAngle += (attempts % 2 === 0 ? 1 : -1) * 0.12
+        } else {
+          distance += 20
+        }
+        attempts++
+      }
+    }
+    
+    // 强制放置
+    if (!placed) {
+      coauthorNodes.push({
+        id: coauthor.coauthorId || coauthor.id,
+        name: coauthor.name,
+        organization: coauthor.organizationName,
+        count: coauthor.count,
+        worksCount: coauthor.worksCount,
+        hIndex: coauthor.hIndex,
+        x: centerX + (baseDistance + 60) * Math.cos(angle),
+        y: centerY + (baseDistance + 60) * Math.sin(angle),
+        radius: nodeRadius,
+        isCenter: false
+      })
     }
   })
   
+  // 设置 nodes
   nodes.value = [centerNode, ...coauthorNodes]
   
   // 创建连接线
@@ -295,7 +380,7 @@ onUnmounted(() => {
   .network-wrapper {
     position: relative;
     width: 100%;
-    height: 500px;
+    height: 600px;
     background: linear-gradient(135deg, #f8fbff 0%, #eef5fc 50%, #f5f9fd 100%);
     border-radius: var(--radius-lg);
     overflow: hidden;

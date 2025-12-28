@@ -11,7 +11,7 @@
           <div class="app-item" v-for="app in applications" :key="app.applicationId">
             <div class="app-info">
               <h4>申请绑定学者：{{ app.authorName }}</h4>
-              <p>机构：{{ app.institutionName }} · 领域：{{ app.field }}</p>
+              <p>机构：{{ app.institutionName }} · 领域：{{ parseFields(app.field) }}</p>
               <span class="app-time">申请时间：{{ formatDate(app.applicationTime) }}</span>
             </div>
             <el-tag :type="getStatusType(app.status)">{{ getStatusText(app.status) }}</el-tag>
@@ -88,7 +88,7 @@
             </div>
             <div class="info-row">
               <span class="label">研究领域：</span>
-              <span class="value">{{ selectedAuthor.fields || '-' }}</span>
+              <span class="value">{{ parseFields(selectedAuthor.fields) }}</span>
             </div>
             <div class="info-row">
               <span class="label">H指数：</span>
@@ -157,6 +157,30 @@ const resetApplyForm = () => {
   Object.keys(applyForm).forEach(k => applyForm[k] = '')
 }
 
+// 解析研究领域（处理 JSON 数组字符串）
+const parseFields = (fields) => {
+  if (!fields) return '-'
+  if (typeof fields === 'string') {
+    const trimmed = fields.trim()
+    // 尝试解析 JSON 数组
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) {
+          return parsed.map(f => typeof f === 'string' ? f : (f.name || f)).join('、')
+        }
+      } catch (e) {
+        // 解析失败，按普通字符串处理
+      }
+    }
+    return fields
+  }
+  if (Array.isArray(fields)) {
+    return fields.map(f => typeof f === 'string' ? f : (f.name || f)).join('、')
+  }
+  return '-'
+}
+
 // 搜索学者
 const searchAuthors = async (query) => {
   if (!query || query.length < 1) {
@@ -166,10 +190,39 @@ const searchAuthors = async (query) => {
   
   searchLoading.value = true
   try {
-    const res = await getAuthors({ keyword: query, page: 1, size: 20 })
+    const res = await getAuthors({ keyword: query, page: 1, size: 50 })
     // 处理返回数据，支持多种格式
     const data = res.data?.data || res.data
-    authorOptions.value = data?.list || data?.items || []
+    let authors = data?.list || data?.items || []
+    
+    // 按姓名相关性排序：完全匹配 > 开头匹配 > 包含匹配
+    const queryLower = query.toLowerCase()
+    authors = authors.sort((a, b) => {
+      const nameA = (a.name || '').toLowerCase()
+      const nameB = (b.name || '').toLowerCase()
+      
+      // 完全匹配优先
+      if (nameA === queryLower && nameB !== queryLower) return -1
+      if (nameB === queryLower && nameA !== queryLower) return 1
+      
+      // 开头匹配次之
+      const aStartsWith = nameA.startsWith(queryLower)
+      const bStartsWith = nameB.startsWith(queryLower)
+      if (aStartsWith && !bStartsWith) return -1
+      if (bStartsWith && !aStartsWith) return 1
+      
+      // 按名字中查询词出现的位置排序
+      const posA = nameA.indexOf(queryLower)
+      const posB = nameB.indexOf(queryLower)
+      if (posA !== -1 && posB !== -1) return posA - posB
+      if (posA !== -1) return -1
+      if (posB !== -1) return 1
+      
+      return 0
+    })
+    
+    // 只返回前20个结果
+    authorOptions.value = authors.slice(0, 20)
   } catch (error) {
     console.error('搜索学者失败', error)
     authorOptions.value = []

@@ -72,11 +72,53 @@
             </el-form-item>
 
             <el-form-item prop="fields">
-              <el-input
-                v-model="form.fields"
-                placeholder="研究领域（可选，多个用分号分隔）"
-                prefix-icon="Collection"
-              />
+              <div class="fields-section">
+                <div class="fields-label">研究领域（可选）</div>
+                <div class="fields-tags-wrapper">
+                  <el-tag
+                    v-for="(field, index) in fieldsList"
+                    :key="index"
+                    closable
+                    @close="handleRemoveField(index)"
+                    class="field-tag"
+                  >
+                    {{ field }}
+                  </el-tag>
+                  <el-popover
+                    v-if="inputVisible"
+                    :visible="showSuggestions && suggestions.length > 0"
+                    placement="bottom-start"
+                    :width="220"
+                    :show-arrow="false"
+                  >
+                    <template #reference>
+                      <el-input
+                        ref="inputRef"
+                        v-model="inputValue"
+                        class="field-input"
+                        size="default"
+                        @input="handleSearchFields"
+                        @keyup.enter="handleInputConfirm"
+                        @blur="handleInputBlur"
+                        placeholder="输入搜索或创建"
+                      />
+                    </template>
+                    <div class="suggestions-list">
+                      <div
+                        v-for="item in suggestions"
+                        :key="item.conceptId"
+                        class="suggestion-item"
+                        @mousedown.prevent="selectSuggestion(item)"
+                      >
+                        {{ item.name }}
+                      </div>
+                    </div>
+                  </el-popover>
+                  <el-button v-if="!inputVisible" class="add-field-btn" @click="showInput">
+                    <el-icon><Plus /></el-icon> 添加
+                  </el-button>
+                </div>
+              </div>
             </el-form-item>
 
             <el-form-item>
@@ -102,13 +144,14 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
+import { register } from '@/api/auth'
+import { getConcepts } from '@/api/concept'
 import { ElMessage } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 
 const router = useRouter()
-const userStore = useUserStore()
 
 const formRef = ref(null)
 const loading = ref(false)
@@ -120,6 +163,114 @@ const form = reactive({
   confirmPassword: '',
   fields: ''
 })
+
+// 研究领域标签相关
+const inputVisible = ref(false)
+const inputValue = ref('')
+const inputRef = ref(null)
+const suggestions = ref([])
+const showSuggestions = ref(false)
+let searchTimeout = null
+
+// 将 fields 字符串转换为数组
+const fieldsList = computed(() => {
+  if (!form.fields) return []
+  return form.fields.split(/[;；]/).map(s => s.trim()).filter(Boolean)
+})
+
+// 显示输入框
+const showInput = () => {
+  inputVisible.value = true
+  suggestions.value = []
+  nextTick(() => {
+    inputRef.value?.focus()
+  })
+}
+
+// 搜索研究领域
+const handleSearchFields = () => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  
+  if (!inputValue.value.trim()) {
+    suggestions.value = []
+    showSuggestions.value = false
+    return
+  }
+  
+  searchTimeout = setTimeout(async () => {
+    try {
+      const res = await getConcepts({ keyword: inputValue.value, page: 1, size: 30 })
+      const data = res.data?.data || res.data
+      let items = data?.list || data?.items || []
+      
+      // 按相关性排序
+      const query = inputValue.value.toLowerCase()
+      items = items.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase()
+        const nameB = (b.name || '').toLowerCase()
+        
+        if (nameA === query && nameB !== query) return -1
+        if (nameB === query && nameA !== query) return 1
+        
+        const aStarts = nameA.startsWith(query)
+        const bStarts = nameB.startsWith(query)
+        if (aStarts && !bStarts) return -1
+        if (bStarts && !aStarts) return 1
+        
+        return nameA.indexOf(query) - nameB.indexOf(query)
+      })
+      
+      suggestions.value = items.slice(0, 10)
+      showSuggestions.value = suggestions.value.length > 0
+    } catch (e) {
+      suggestions.value = []
+      showSuggestions.value = false
+    }
+  }, 300)
+}
+
+// 选择建议
+const selectSuggestion = (item) => {
+  const newFields = [...fieldsList.value, item.name]
+  form.fields = newFields.join(';')
+  inputVisible.value = false
+  inputValue.value = ''
+  suggestions.value = []
+  showSuggestions.value = false
+}
+
+// 输入框失焦
+const handleInputBlur = () => {
+  setTimeout(() => {
+    if (inputValue.value.trim()) {
+      const newFields = [...fieldsList.value, inputValue.value.trim()]
+      form.fields = newFields.join(';')
+    }
+    inputVisible.value = false
+    inputValue.value = ''
+    suggestions.value = []
+    showSuggestions.value = false
+  }, 150)
+}
+
+// 确认输入
+const handleInputConfirm = () => {
+  if (inputValue.value.trim()) {
+    const newFields = [...fieldsList.value, inputValue.value.trim()]
+    form.fields = newFields.join(';')
+  }
+  inputVisible.value = false
+  inputValue.value = ''
+  suggestions.value = []
+  showSuggestions.value = false
+}
+
+// 删除标签
+const handleRemoveField = (index) => {
+  const newFields = [...fieldsList.value]
+  newFields.splice(index, 1)
+  form.fields = newFields.join(';')
+}
 
 const validateConfirmPassword = (rule, value, callback) => {
   if (value !== form.password) {
@@ -156,14 +307,14 @@ const handleRegister = async () => {
 
     loading.value = true
     try {
-      await userStore.register({
+      await register({
         email: form.email,
         nickname: form.nickname,
         password: form.password,
         fields: form.fields
       })
-      ElMessage.success('注册成功')
-      router.push('/')
+      ElMessage.success('注册成功，请登录')
+      router.push('/login')
     } catch (error) {
       console.error('注册失败', error)
     } finally {
@@ -273,6 +424,60 @@ const handleRegister = async () => {
     a {
       color: var(--primary-color);
       font-weight: 500;
+    }
+  }
+  
+  .fields-section {
+    width: 100%;
+    
+    .fields-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+  }
+  
+  .fields-tags-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--bg-light);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
+    min-height: 44px;
+    width: 100%;
+    
+    .field-tag {
+      margin: 0;
+    }
+    
+    .field-input {
+      width: 120px;
+      flex-shrink: 0;
+    }
+    
+    .add-field-btn {
+      border-style: dashed;
+      color: var(--text-secondary);
+    }
+  }
+}
+
+.suggestions-list {
+  max-height: 200px;
+  overflow-y: auto;
+  
+  .suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 13px;
+    
+    &:hover {
+      background: var(--primary-lighter);
+      color: var(--primary-color);
     }
   }
 }
