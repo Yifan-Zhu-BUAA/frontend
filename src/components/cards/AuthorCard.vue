@@ -1,7 +1,7 @@
 <template>
   <div class="author-card" @click="goToDetail">
     <div class="card-header">
-      <el-avatar :size="60" :src="author.avatar">
+      <el-avatar :size="48" :src="author.avatar">
         {{ author.name?.charAt(0) }}
       </el-avatar>
       <div class="author-info">
@@ -50,8 +50,21 @@ const goToDetail = () => {
 
 const formatFields = (fields) => {
   if (!fields) return ''
-  if (typeof fields === 'string') return fields
-  if (Array.isArray(fields)) return fields.map(f => f.name || f).join('; ')
+  // 尝试解析 JSON 格式的字段
+  if (typeof fields === 'string') {
+    try {
+      const parsed = JSON.parse(fields)
+      if (Array.isArray(parsed)) {
+        return parsed.slice(0, 2).join('、')
+      }
+    } catch (e) {
+      // 如果不是 JSON，直接返回字符串
+      return fields.length > 30 ? fields.slice(0, 30) + '...' : fields
+    }
+  }
+  if (Array.isArray(fields)) {
+    return fields.slice(0, 2).map(f => f.name || f).join('、')
+  }
   return ''
 }
 
@@ -67,10 +80,16 @@ const formatNumber = (num) => {
 .author-card {
   background: var(--bg-white);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  padding: 16px;
   cursor: pointer;
   transition: all var(--transition-normal);
   border: 1px solid var(--border-lighter);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0; // 关键：允许 flex 子元素收缩
+  overflow: hidden;
 
   &:hover {
     transform: translateY(-4px);
@@ -82,16 +101,21 @@ const formatNumber = (num) => {
 .card-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 12px;
+
+  .el-avatar {
+    flex-shrink: 0;
+  }
 
   .author-info {
     flex: 1;
     min-width: 0;
+    overflow: hidden;
   }
 
   .author-name {
-    font-size: 18px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 4px;
@@ -101,7 +125,7 @@ const formatNumber = (num) => {
   }
 
   .author-org {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -110,20 +134,31 @@ const formatNumber = (num) => {
 }
 
 .card-body {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  flex: 1;
+  min-height: 36px;
 
   .author-fields {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
-    font-size: 13px;
+    gap: 6px;
+    font-size: 12px;
     color: var(--text-regular);
-    line-height: 1.6;
+    line-height: 1.5;
 
     .el-icon {
       flex-shrink: 0;
       margin-top: 2px;
       color: var(--primary-color);
+      font-size: 14px;
+    }
+    
+    span {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      word-break: break-all;
     }
   }
 }
@@ -131,21 +166,23 @@ const formatNumber = (num) => {
 .card-footer {
   display: flex;
   justify-content: space-around;
-  padding-top: 16px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-lighter);
 
   .stat-item {
     text-align: center;
+    flex: 1;
+    min-width: 0;
 
     .stat-value {
       display: block;
-      font-size: 20px;
+      font-size: 16px;
       font-weight: 600;
       color: var(--primary-color);
     }
 
     .stat-label {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-secondary);
     }
   }

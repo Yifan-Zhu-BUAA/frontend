@@ -71,7 +71,7 @@
         <!-- 推荐论文 -->
         <div class="recommend-block">
           <div class="block-header">
-            <h3>📚 推荐论文</h3>
+            <h3>推荐论文</h3>
             <el-button text type="primary" @click="refreshRecommendWorks" :loading="loadingRecommendWorks">
               <el-icon><Refresh /></el-icon> 换一批
             </el-button>
@@ -90,7 +90,7 @@
         <!-- 推荐学者 -->
         <div class="recommend-block">
           <div class="block-header">
-            <h3>👨‍🔬 推荐学者</h3>
+            <h3>推荐学者</h3>
             <el-button text type="primary" @click="refreshRecommendAuthors" :loading="loadingRecommendAuthors">
               <el-icon><Refresh /></el-icon> 换一批
             </el-button>
@@ -482,7 +482,7 @@ onMounted(() => {
 // 个性化推荐区域
 .personalized-section {
   padding: 60px 0;
-  background: linear-gradient(180deg, #FFF9F0 0%, #FFFFFF 100%);
+  background: linear-gradient(180deg, #F0F7FF 0%, #FFFFFF 100%);
   
   .personalized-header {
     text-align: center;
@@ -499,7 +499,7 @@ onMounted(() => {
       margin-bottom: 8px;
       
       .el-icon {
-        color: #E6A23C;
+        color: var(--primary-color);
       }
     }
     
@@ -510,7 +510,12 @@ onMounted(() => {
   }
   
   .recommend-block {
-    margin-bottom: 40px;
+    background: var(--bg-white);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
     
     &:last-child {
       margin-bottom: 0;
@@ -521,6 +526,8 @@ onMounted(() => {
       justify-content: space-between;
       align-items: center;
       margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-lighter);
       
       h3 {
         font-size: 18px;
@@ -532,15 +539,38 @@ onMounted(() => {
     .works-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-      min-height: 200px;
+      gap: 20px;
+      
+      :deep(.work-card) {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        
+        .card-body {
+          flex: 1;
+        }
+      }
     }
     
     .authors-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 24px;
-      min-height: 200px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 20px;
+      
+      :deep(.author-card) {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        
+        .card-body {
+          flex: 1;
+        }
+      }
+    }
+    
+    :deep(.el-empty) {
+      grid-column: 1 / -1;
+      padding: 40px 0;
     }
   }
 }
@@ -607,7 +637,7 @@ onMounted(() => {
 
   .authors-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 24px;
     min-height: 200px;
   }

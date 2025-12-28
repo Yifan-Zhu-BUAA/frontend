@@ -212,13 +212,13 @@ onMounted(() => {
 
 .institution-tabs {
   .tab-content { min-height: 300px; }
-  .authors-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .authors-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
   .works-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
   .pagination { margin-top: 24px; justify-content: center; }
 }
 
 @media (max-width: 1200px) {
-  .institution-tabs .authors-grid { grid-template-columns: repeat(2, 1fr); }
+  .institution-tabs .authors-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .institution-tabs .works-grid { grid-template-columns: 1fr; }
 }
 </style>
