@@ -57,6 +57,57 @@
       </div>
     </section>
 
+    <!-- 个性化推荐区域（登录用户可见） -->
+    <section class="personalized-section" v-if="userStore.isLoggedIn">
+      <div class="page-container">
+        <div class="personalized-header">
+          <h2 class="section-title">
+            <el-icon><MagicStick /></el-icon>
+            为你推荐
+          </h2>
+          <p class="section-desc">基于你的收藏和关注，精心挑选的内容</p>
+        </div>
+        
+        <!-- 推荐论文 -->
+        <div class="recommend-block">
+          <div class="block-header">
+            <h3>📚 推荐论文</h3>
+            <el-button text type="primary" @click="refreshRecommendWorks" :loading="loadingRecommendWorks">
+              <el-icon><Refresh /></el-icon> 换一批
+            </el-button>
+          </div>
+          <div class="works-grid" v-loading="loadingRecommendWorks">
+            <WorkCard 
+              v-for="work in recommendedWorks" 
+              :key="work.workId"
+              :work="work"
+            />
+            <el-empty v-if="!loadingRecommendWorks && recommendedWorks.length === 0" 
+              description="收藏一些论文，我们会为你推荐更多感兴趣的内容" />
+          </div>
+        </div>
+        
+        <!-- 推荐学者 -->
+        <div class="recommend-block">
+          <div class="block-header">
+            <h3>👨‍🔬 推荐学者</h3>
+            <el-button text type="primary" @click="refreshRecommendAuthors" :loading="loadingRecommendAuthors">
+              <el-icon><Refresh /></el-icon> 换一批
+            </el-button>
+          </div>
+          <div class="authors-grid" v-loading="loadingRecommendAuthors">
+            <AuthorCard 
+              v-for="author in recommendedAuthors" 
+              :key="author.id"
+              :author="author"
+            />
+            <el-empty v-if="!loadingRecommendAuthors && recommendedAuthors.length === 0" 
+              description="关注一些学者，我们会为你推荐更多相关学者" />
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- 快速入口 -->
     <section class="quick-entry-section">
       <div class="page-container">
@@ -121,12 +172,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 import AuthorCard from '@/components/cards/AuthorCard.vue'
 import WorkCard from '@/components/cards/WorkCard.vue'
-import { getAuthors } from '@/api/author'
-import { getWorks } from '@/api/work'
+import { getAuthors, getRecommendedAuthorsForUser } from '@/api/author'
+import { getWorks, getRecommendedWorksForUser } from '@/api/work'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 const searchKeyword = ref('')
 const hotKeywords = ['人工智能', '机器学习', '深度学习', '计算机视觉', '自然语言处理']
@@ -171,8 +224,12 @@ const entries = [
 
 const hotAuthors = ref([])
 const recentWorks = ref([])
+const recommendedWorks = ref([])
+const recommendedAuthors = ref([])
 const loadingAuthors = ref(false)
 const loadingWorks = ref(false)
+const loadingRecommendWorks = ref(false)
+const loadingRecommendAuthors = ref(false)
 
 const handleSearch = () => {
   if (searchKeyword.value.trim()) {
@@ -207,9 +264,57 @@ const fetchRecentWorks = async () => {
   }
 }
 
+// 获取个性化推荐论文
+const fetchRecommendedWorks = async (refresh = null) => {
+  if (!userStore.isLoggedIn) return
+  
+  loadingRecommendWorks.value = true
+  try {
+    const res = await getRecommendedWorksForUser(6, refresh)
+    recommendedWorks.value = res.data || []
+  } catch (error) {
+    console.error('获取推荐论文失败', error)
+    recommendedWorks.value = []
+  } finally {
+    loadingRecommendWorks.value = false
+  }
+}
+
+// 获取个性化推荐学者
+const fetchRecommendedAuthors = async (refresh = null) => {
+  if (!userStore.isLoggedIn) return
+  
+  loadingRecommendAuthors.value = true
+  try {
+    const res = await getRecommendedAuthorsForUser(4, refresh)
+    recommendedAuthors.value = res.data || []
+  } catch (error) {
+    console.error('获取推荐学者失败', error)
+    recommendedAuthors.value = []
+  } finally {
+    loadingRecommendAuthors.value = false
+  }
+}
+
+// 刷新推荐论文（换一批）
+const refreshRecommendWorks = () => {
+  // 使用当前时间戳作为随机种子，确保每次换一批都不同
+  fetchRecommendedWorks(Date.now())
+}
+
+// 刷新推荐学者（换一批）
+const refreshRecommendAuthors = () => {
+  fetchRecommendedAuthors(Date.now())
+}
+
 onMounted(() => {
   fetchHotAuthors()
   fetchRecentWorks()
+  // 如果用户已登录，获取个性化推荐
+  if (userStore.isLoggedIn) {
+    fetchRecommendedWorks()
+    fetchRecommendedAuthors()
+  }
 })
 </script>
 
@@ -374,6 +479,72 @@ onMounted(() => {
   }
 }
 
+// 个性化推荐区域
+.personalized-section {
+  padding: 60px 0;
+  background: linear-gradient(180deg, #FFF9F0 0%, #FFFFFF 100%);
+  
+  .personalized-header {
+    text-align: center;
+    margin-bottom: 40px;
+    
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      
+      .el-icon {
+        color: #E6A23C;
+      }
+    }
+    
+    .section-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+  }
+  
+  .recommend-block {
+    margin-bottom: 40px;
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+    
+    .block-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      
+      h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+    }
+    
+    .works-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      min-height: 200px;
+    }
+    
+    .authors-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      min-height: 200px;
+    }
+  }
+}
+
 // 快速入口
 .quick-entry-section {
   padding: 60px 0;
@@ -468,11 +639,13 @@ onMounted(() => {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .hot-authors-section .authors-grid {
+  .hot-authors-section .authors-grid,
+  .personalized-section .recommend-block .authors-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .recent-works-section .works-grid {
+  .recent-works-section .works-grid,
+  .personalized-section .recommend-block .works-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -489,7 +662,9 @@ onMounted(() => {
   .stats-section .stats-grid,
   .quick-entry-section .entry-grid,
   .hot-authors-section .authors-grid,
-  .recent-works-section .works-grid {
+  .recent-works-section .works-grid,
+  .personalized-section .recommend-block .works-grid,
+  .personalized-section .recommend-block .authors-grid {
     grid-template-columns: 1fr;
   }
 }

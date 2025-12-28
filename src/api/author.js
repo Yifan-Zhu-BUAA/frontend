@@ -39,3 +39,12 @@ export function getAuthorCoauthors(authorId, params) {
 export function getRecommendedAuthors(authorId, limit = 10) {
   return request.get(`/achievements/recommend/authors/${authorId}`, { params: { limit } })
 }
+
+// 为用户推荐学者（个性化推荐）
+export function getRecommendedAuthorsForUser(limit = 10, refresh = null) {
+  const params = { limit }
+  if (refresh !== null) {
+    params.refresh = refresh
+  }
+  return request.get('/achievements/recommend/user/authors', { params })
+}

@@ -323,7 +323,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { getWorkById, getWorkReferences, getWorkCitedBy, getWorkRelated } from '@/api/work'
+import { getWorkById, getWorkReferences, getWorkCitedBy, getRecommendedWorks } from '@/api/work'
 import { getComments, createComment, likeComment, unlikeComment, getCommentReplies } from '@/api/comment'
 import { addToCollection, getFavourites, getMyCollections, removeCollectionByWork } from '@/api/collection'
 import { addHistory } from '@/api/collection'
@@ -434,8 +434,8 @@ const fetchCitedBy = async () => {
 const fetchRelated = async () => {
   refLoading.value = true
   try {
-    const res = await getWorkRelated(route.params.id)
-    relatedWorks.value = res.data?.list || []
+    const res = await getRecommendedWorks(route.params.id, 10)
+    relatedWorks.value = res.data || []
   } catch (error) {
     console.error('获取相关著作失败', error)
   } finally {
