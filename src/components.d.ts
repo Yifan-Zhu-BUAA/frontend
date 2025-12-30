@@ -12,6 +12,7 @@ declare module 'vue' {
     AuthorCard: typeof import('./components/cards/AuthorCard.vue')['default']
     AuthorNetwork: typeof import('./components/AuthorNetwork.vue')['default']
     ConceptCard: typeof import('./components/cards/ConceptCard.vue')['default']
+    ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAutocomplete: typeof import('element-plus/es')['ElAutocomplete']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
     ElBadge: typeof import('element-plus/es')['ElBadge']

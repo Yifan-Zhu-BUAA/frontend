@@ -15,7 +15,7 @@ const ERROR_CODE_MAP = {
 // 创建 axios 实例
 const request = axios.create({
   baseURL: '/api',
-  timeout: 15000,
+  timeout: 90000, // 增加到90秒，因为推荐服务需要60-70秒
 })
 
 // 请求拦截器
@@ -80,6 +80,12 @@ request.interceptors.response.use(  (response) => {
     return { code: 0, data: res, msg: 'success' }
   },
   (error) => {
+    // 处理超时错误（可能是服务器内存溢出或响应慢）
+    if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+      ElMessage.error('请求超时，服务器可能正在处理大量数据，请稍后重试')
+      return Promise.reject(error)
+    }
+    
     // 处理 HTTP 错误
     if (error.response) {
       const status = error.response.status
@@ -113,13 +119,18 @@ request.interceptors.response.use(  (response) => {
           ElMessage.error(data?.message || '数据冲突')
           break
         case 500:
-          ElMessage.error('服务器错误')
+          // 500 错误可能是内存溢出导致的
+          ElMessage.error('服务器内部错误，可能是资源不足，请联系管理员')
+          break
+        case 503:
+          ElMessage.error('服务暂时不可用，请稍后重试')
           break
         default:
           ElMessage.error(data?.message || data?.msg || '请求失败')
       }
     } else if (error.request) {
-      ElMessage.error('网络错误，请检查网络连接')
+      // 网络错误或服务器无响应
+      ElMessage.error('无法连接到服务器，请检查网络连接或稍后重试')
     } else {
       ElMessage.error('请求配置错误')
     }

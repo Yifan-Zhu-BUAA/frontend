@@ -5,9 +5,16 @@ export function getWorks(params) {
   return request.get('/achievements/works', { params })
 }
 
+// 最新著作（首页快速接口，无 COUNT）
+export function getRecentWorks(size = 6) {
+  return request.get('/achievements/works/recent', { params: { size } })
+}
+
 // 著作详情
 export function getWorkById(workId) {
-  return request.get(`/achievements/works/${workId}`)
+  return request.get(`/achievements/works/${workId}`, {
+    timeout: 120000 // 著作详情接口可能需要更长时间，设置为120秒
+  })
 }
 
 // 著作引用文献
@@ -36,7 +43,10 @@ export function getRecommendedWorksForUser(limit = 10, refresh = null) {
   if (refresh !== null) {
     params.refresh = refresh
   }
-  return request.get('/achievements/recommend/user/works', { params })
+  return request.get('/achievements/recommend/user/works', { 
+    params,
+    timeout: 120000 // 推荐接口需要更长时间，设置为120秒
+  })
 }
 
 // 高级搜索

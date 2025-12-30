@@ -272,8 +272,8 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import AuthorCard from '@/components/cards/AuthorCard.vue'
 import WorkCard from '@/components/cards/WorkCard.vue'
-import { getAuthors, getRecommendedAuthorsForUser } from '@/api/author'
-import { getWorks, getRecommendedWorksForUser } from '@/api/work'
+import { getHotAuthors, getRecommendedAuthorsForUser } from '@/api/author'
+import { getRecentWorks, getRecommendedWorksForUser } from '@/api/work'
 import { getInstitutions } from '@/api/institution'
 import { getConcepts } from '@/api/concept'
 import { Filter, ArrowDown } from '@element-plus/icons-vue'
@@ -313,6 +313,13 @@ const entries = [
     title: '著作检索', 
     desc: '搜索论文、书籍等学术成果',
     color: 'linear-gradient(135deg, #67C23A 0%, #52A630 100%)'
+  },
+  { 
+    path: '/works/advanced-search', 
+    icon: 'Search', 
+    title: '高级检索', 
+    desc: '多条件组合搜索，精准定位目标文献',
+    color: 'linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%)'
   },
   { 
     path: '/institutions', 
@@ -503,7 +510,8 @@ const handleSearch = () => {
 const fetchHotAuthors = async () => {
   loadingAuthors.value = true
   try {
-    const res = await getAuthors({ page: 1, size: 4 })
+    const res = await getHotAuthors(4)
+    // 后端返回的是 PageResponse，字段是 list
     hotAuthors.value = res.data?.list || []
   } catch (error) {
     console.error('获取热门学者失败', error)
@@ -515,7 +523,8 @@ const fetchHotAuthors = async () => {
 const fetchRecentWorks = async () => {
   loadingWorks.value = true
   try {
-    const res = await getWorks({ page: 1, size: 6 })
+    const res = await getRecentWorks(6)
+    // 后端返回的是 PageResponse，字段是 list
     recentWorks.value = res.data?.list || []
   } catch (error) {
     console.error('获取最新著作失败', error)
@@ -917,7 +926,7 @@ onMounted(() => {
 
   .entry-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 24px;
   }
 
@@ -999,6 +1008,12 @@ onMounted(() => {
 }
 
 // 响应式
+@media (max-width: 1400px) {
+  .quick-entry-section .entry-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 1200px) {
   .stats-section .stats-grid,
   .quick-entry-section .entry-grid {

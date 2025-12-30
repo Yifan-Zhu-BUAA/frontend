@@ -5,6 +5,11 @@ export function getAuthors(params) {
   return request.get('/achievements/authors', { params })
 }
 
+// 热门学者（首页快速接口，无 COUNT）
+export function getHotAuthors(size = 4) {
+  return request.get('/achievements/authors/hot', { params: { size } })
+}
+
 // 学者详情
 export function getAuthorById(authorId) {
   return request.get(`/achievements/authors/${authorId}`)
@@ -46,7 +51,10 @@ export function getRecommendedAuthorsForUser(limit = 10, refresh = null) {
   if (refresh !== null) {
     params.refresh = refresh
   }
-  return request.get('/achievements/recommend/user/authors', { params })
+  return request.get('/achievements/recommend/user/authors', { 
+    params,
+    timeout: 120000 // 推荐接口需要更长时间，设置为120秒
+  })
 }
 
 // 获取学者引用趋势
